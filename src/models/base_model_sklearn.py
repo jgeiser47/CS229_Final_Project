@@ -17,7 +17,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 def get_data(data_dir, region, city):
     
     # second pass file (might need to be cleaned a little in the future)
-    filepath = os.path.join(data_dir, f'{region}_{city}_second_pass.csv')
+    filepath = os.path.join(data_dir, f'{region}_{city}_third_pass.csv')
     df = pd.read_csv(filepath)
     
     # Constants corresponding to start/end rows of CSV (assuming not LA datafile)
@@ -27,29 +27,23 @@ def get_data(data_dir, region, city):
     # Get list of columns that will be used for X dataset
     x_cols = list(df.columns)
     x_cols.remove('date_hour')
-    x_cols.remove('date')
     x_cols.remove('load')
     
     # Get X dataset as numpy array
     X = df[x_cols][start_index:end_index]
     X = np.array(X)
     
-    # Had to manually change hour column from string to int
-    # May adjust CSV in future to make this a little cleaner
-    X[:,0] = [int(hour_str.split(':')[0]) for hour_str in X[:,0]]
-    
     # Get y dataset as numpy array
     y_cols = ['load']
     y = df[y_cols][start_index:end_index]
     y = np.array(y)
-    #y = y[:,0]
     
     return X, y
 
 def main():
     
     # Path to data directory contaning CSVs 
-    data_dir = os.path.join(os.getcwd(), '..', '..', 'data', 'interim')
+    data_dir = os.path.join(os.getcwd(), 'data', 'interim')
     data_dir = os.path.abspath(data_dir)
     
     # For now, just run on one city at a time
