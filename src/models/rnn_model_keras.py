@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
-from base_model_sklearn import get_data
 
 def create_window_data(data, window, keep_whole_window=True):
     """Preprocess data to match RNN model specification
@@ -58,24 +57,28 @@ def define_vanilla_lstm(window, num_features, units):
     return model
 
 def main():
-    # Path to data directory contaning CSVs 
-    data_dir = os.path.join(os.getcwd(), 'data', 'interim')
-    data_dir = os.path.abspath(data_dir)
-    
     # For now, just run on one city at a time
     region = 'ercot'
     city = 'houston'
+
+    # Read appropriate CSV into a dataframe
+    data_dir = os.path.join(os.getcwd(), 'data', 'interim')
+    data_dir = os.path.abspath(data_dir)
+    filepath = os.path.join(data_dir, f'{region}_{city}_third_pass.csv')
+    df = pd.read_csv(filepath)
     
-    # Get design matrix and labels
-    X,y = get_data(data_dir, region, city)
-    
+    # Select data columns for the RNN
+    input_keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend', 'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc']
+    y = df['load'].to_numpy()
+    y = np.expand_dims(y, axis=1)
+    X = df[input_keep_cols].to_numpy()
+
     # Split into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
     
     # Train model and predict
     X_train_tensor = create_window_data(X_train, window = 6)
     y_train_tensor = create_window_data(y_train, window = 6, keep_whole_window=False)
-    #TODO: Select columns for use in the NN
     
     model = define_vanilla_lstm(window = 6, num_features = X_train.shape[1], units=20)
     model.fit(X_train_tensor, y_train_tensor, epochs=30)
