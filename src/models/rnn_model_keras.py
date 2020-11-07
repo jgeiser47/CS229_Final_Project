@@ -83,14 +83,17 @@ def main():
     X_test = df_test[input_keep_cols].to_numpy()
     
     # Train model and predict
-    X_train_tensor = create_window_data(X_train, window = 6)
-    y_train_tensor = create_window_data(y_train, window = 6, keep_whole_window=False)
+    window = 6
+    memory_layer_units = 20
+    training_epochs = 30
+    X_train_tensor = create_window_data(X_train, window = window)
+    y_train_tensor = create_window_data(y_train, window = window, keep_whole_window=False)
     
-    model = define_vanilla_lstm(window = 6, num_features = X_train.shape[1], units=20)
-    model.fit(X_train_tensor, y_train_tensor, epochs=30)
+    model = define_vanilla_lstm(window = window, num_features = X_train.shape[1], units=memory_layer_units)
+    model.fit(X_train_tensor, y_train_tensor, epochs=training_epochs)
 
-    X_test_tensor = create_window_data(X_test, window = 6)
-    y_test_tensor = create_window_data(y_test, window = 6, keep_whole_window=False)
+    X_test_tensor = create_window_data(X_test, window = window)
+    y_test_tensor = create_window_data(y_test, window = window, keep_whole_window=False)
     y_pred = model.predict(X_test_tensor)
 
     # Scatter plot of predictions vs true values
