@@ -92,8 +92,8 @@ def main():
     plt.show()
     
     # Error statistics
-    MSE = mean_squared_error(y_test, y_pred)
-    R2_score = r2_score(y_test, y_pred)
+    MSE = mean_squared_error(y_test_tensor, y_pred)
+    R2_score = r2_score(y_test_tensor, y_pred)
     
     print(f'Mean Squared Error: {MSE:.2f}')
     print(f'R2 Score: {R2_score:.3f}')
