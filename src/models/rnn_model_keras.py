@@ -83,8 +83,8 @@ def main():
     X_test = df_test[input_keep_cols].to_numpy()
     
     # Train model and predict
-    window = 6
-    memory_layer_units = 20
+    window = 24
+    memory_layer_units = 10
     training_epochs = 30
     X_train_tensor = create_window_data(X_train, window = window)
     y_train_tensor = create_window_data(y_train, window = window, keep_whole_window=False)
