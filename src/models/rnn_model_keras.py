@@ -78,11 +78,15 @@ def main():
     #TODO: Select columns for use in the NN
     
     model = define_vanilla_lstm(window = 6, num_features = X_train.shape[1], units=20)
-    model.fit(X_train_tensor, y_train_tensor, epochs=3)
+    model.fit(X_train_tensor, y_train_tensor, epochs=30)
+
+    X_test_tensor = create_window_data(X_test, window = 6)
+    y_test_tensor = create_window_data(y_test, window = 6, keep_whole_window=False)
+    y_pred = model.predict(X_test_tensor)
 
     # Scatter plot of predictions vs true values
     plt.figure()
-    plt.scatter(y_test, y_pred)
+    plt.scatter(y_test_tensor, y_pred)
     plt.xlabel('True Load')
     plt.ylabel('Predicted Load')
     plt.show()
