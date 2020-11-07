@@ -12,22 +12,32 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 from base_model_sklearn import get_data
 
-def create_window_tensor(X, window):
-    """Preprocess data using keras for the RNN
+def create_window_data(data, window, keep_whole_window=True):
+    """Preprocess data to match RNN model specification
     
     Args:
-        X: matrix of inputs for the RNN (num_steps, num_features)
+        data: matrix of inputs for the RNN (num_steps, num_features)
         window: the width of the look-back window used for the RNN
+        keep_whole_window: flag controlling whether the whole window
+            will be preserved in each entry of the output, or only
+            the current element at the end of the window.
 
     Returns: 3-dimensional tensor (np.ndarray) of dimensions
-    (num_steps, window, num_features) ready for input to an LSTM
+    (num_steps, window [or 1 if keep_whole_window is False], num_features) 
+    ready for input to an LSTM.
     """
-    window_list = []
-    for i in range(window-1, X.shape[0]):
-        cur_window = X[(i-window):i,:]
-        window_list.append(cur_window)
-    window_list = window_list[1:len(window_list)-1]
-    return window_list
+    num_steps = data.shape[0] - window
+    num_features = data.shape[1]
+    if keep_whole_window is False:
+        keep_nelems = 1
+    else:
+        keep_nelems = window
+    arr = np.zeros((num_steps, keep_nelems, num_features))
+    for i in range(window, num_steps):
+        cur_window = data[(i-keep_nelems):i,:]
+        arr[i-window,:,:] = cur_window
+    arr = arr.squeeze()
+    return arr
 
 def main():
     # Path to data directory contaning CSVs 
@@ -45,7 +55,8 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
     
     # Train model and predict
-    X_train_list = create_window_tensor(X_train, window = 6)
+    X_train_tensor = create_window_data(X_train, window = 6)
+    y_train_tensor = create_window_data(y_train, window = 6, keep_whole_window=False)
     #TODO: Select columns for use in the NN
     
     # Scatter plot of predictions vs true values
