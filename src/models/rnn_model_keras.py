@@ -39,6 +39,24 @@ def create_window_data(data, window, keep_whole_window=True):
     arr = arr.squeeze()
     return arr
 
+def define_vanilla_lstm(window, num_features, units):
+    """Defines a Vanilla LSTM model using Keras
+
+    Args:
+        window: width of the look-back window used for the model's
+            input data
+        num_features: number of features in the input data
+        units: dimension of "memory" space
+
+    Returns: keras Sequential model object
+    """
+    model = keras.models.Sequential()
+    model.add(keras.layers.LSTM(units, input_shape=(window, num_features)))
+    model.add(keras.layers.Dense(1))
+    model.compile(optimizer='adam', loss='mse')
+
+    return model
+
 def main():
     # Path to data directory contaning CSVs 
     data_dir = os.path.join(os.getcwd(), 'data', 'interim')
@@ -59,6 +77,9 @@ def main():
     y_train_tensor = create_window_data(y_train, window = 6, keep_whole_window=False)
     #TODO: Select columns for use in the NN
     
+    model = define_vanilla_lstm(window = 6, num_features = X_train.shape[1], units=20)
+    model.fit(X_train_tensor, y_train_tensor, epochs=3)
+
     # Scatter plot of predictions vs true values
     plt.figure()
     plt.scatter(y_test, y_pred)
