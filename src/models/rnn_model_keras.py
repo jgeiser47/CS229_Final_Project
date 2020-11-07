@@ -4,6 +4,7 @@ Recurrent neural network model for electricity load
 import os
 import numpy as np
 import pandas as pd
+import datetime
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
@@ -67,14 +68,19 @@ def main():
     filepath = os.path.join(data_dir, f'{region}_{city}_third_pass.csv')
     df = pd.read_csv(filepath)
     
+    # Split train/test data
+    df.index = pd.to_datetime(df.date_hour)
+    df_train = df[:'2019-12-31']
+    df_test = df['2020-01-01':'2020-03-01']
+
     # Select data columns for the RNN
     input_keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend', 'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc']
-    y = df['load'].to_numpy()
-    y = np.expand_dims(y, axis=1)
-    X = df[input_keep_cols].to_numpy()
-
-    # Split into train and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+    y_train = df_train['load'].to_numpy()
+    y_train= np.expand_dims(y_train, axis=1)
+    X_train = df_train[input_keep_cols].to_numpy()
+    y_test = df_test['load'].to_numpy()
+    y_test= np.expand_dims(y_test, axis=1)
+    X_test = df_test[input_keep_cols].to_numpy()
     
     # Train model and predict
     X_train_tensor = create_window_data(X_train, window = 6)
