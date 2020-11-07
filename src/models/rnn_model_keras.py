@@ -8,7 +8,6 @@ import datetime
 import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
 
@@ -51,7 +50,8 @@ def define_vanilla_lstm(window, num_features, units):
     Returns: keras Sequential model object
     """
     model = keras.models.Sequential()
-    model.add(keras.layers.LSTM(units, input_shape=(window, num_features)))
+    model.add(keras.layers.BatchNormalization(axis=1, input_shape=(window, num_features)))
+    model.add(keras.layers.LSTM(units))
     model.add(keras.layers.Dense(1))
     model.compile(optimizer='adam', loss='mse')
 
