@@ -85,7 +85,7 @@ def get_data(data_dir, region, city):
 def main():
     
     # Path to data directory contaning CSVs 
-    data_dir = os.path.join(os.getcwd(), 'data', 'interim')
+    data_dir = os.path.join(os.getcwd(), '..', '..', 'data', 'interim')
     data_dir = os.path.abspath(data_dir)
     
     # For now, just run on one city at a time
