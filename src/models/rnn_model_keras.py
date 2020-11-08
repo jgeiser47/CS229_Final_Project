@@ -9,6 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import scale
 
 
 def create_window_data(data, window, keep_whole_window=True):
@@ -50,8 +51,7 @@ def define_vanilla_lstm(window, num_features, units):
     Returns: keras Sequential model object
     """
     model = keras.models.Sequential()
-    model.add(keras.layers.BatchNormalization(axis=1, input_shape=(window, num_features)))
-    model.add(keras.layers.LSTM(units))
+    model.add(keras.layers.LSTM(units, input_shape=(window, num_features)))
     model.add(keras.layers.Dense(1))
     model.compile(optimizer='adam', loss='mse')
 
@@ -78,9 +78,11 @@ def main():
     y_train = df_train['load'].to_numpy()
     y_train= np.expand_dims(y_train, axis=1)
     X_train = df_train[input_keep_cols].to_numpy()
+    X_train = scale(X_train, axis=0)
     y_test = df_test['load'].to_numpy()
     y_test= np.expand_dims(y_test, axis=1)
     X_test = df_test[input_keep_cols].to_numpy()
+    X_test = scale(X_train, axis=0)
     
     # Train model and predict
     window = 24
