@@ -51,8 +51,8 @@ def get_data(data_dir, region, city):
     df = pd.read_csv(filepath)
     
     # Constants corresponding to start/end rows of CSV (assuming not LA datafile)
-    start_index = 168 # First line where all features have data
-    end_index = 26280 # End at last day/hour of 2019
+    start_index = 0 # First line where all features have data
+    end_index = 26112 # End at last day/hour of 2019
     
     # Get list of columns that will be used for X dataset
     x_cols = list(df.columns)
@@ -70,7 +70,7 @@ def get_data(data_dir, region, city):
     
     # Split off December 2019 into a separate validation set for timeseries
     # data visualization
-    slice_index = 25536 - start_index
+    slice_index = 25368 - start_index
     X_test = X[slice_index:]
     y_test = y[slice_index:]
     X = X[:slice_index]
