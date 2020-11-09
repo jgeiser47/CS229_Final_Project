@@ -11,6 +11,28 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 
+def scale_columns(df, col_name_list):
+    """Scale columns named in col_name_list to mean zero, sd one,
+    and return the individual scaler objects in a dictionary.
+
+    Args:
+        df: pandas DataFrame with columns to be scaled
+        col_name_list: list of string column names denoting columns
+            to be scaled
+
+    Returns: Tuple of two objects. The first is the scaled dataframe.
+    The second is a dictionary of scaler objects, the keys are the column names
+    of the column scaled by each scaler.
+    """
+    scaler_dict = {}
+    for cur_name in col_name_list:
+        cur_scaler = StandardScaler()
+        cur_data = df.loc[:, cur_name].values
+        cur_data = np.expand_dims(cur_data, axis=1)
+        cur_scaler.fit(cur_data)
+        df.loc[:, cur_name] = cur_scaler.transform(cur_data).squeeze()
+        scaler_dict[cur_name] = cur_scaler
+    return (df, scaler_dict)
 
 def create_window_data(data, window, keep_whole_window=True):
     """Preprocess data to match RNN model specification
@@ -76,9 +98,7 @@ def main():
 
     # Scale the data
     float_cols = list(df_select.columns[df_select.dtypes==np.float64])
-    float_scaler = StandardScaler(copy=False)
-    float_scaler.fit(df_select.loc[:, float_cols])
-    df_select.loc[:, float_cols] = float_scaler.transform(df_select.loc[:, float_cols])
+    df_select, scaler_dict = scale_columns(df_select, float_cols)
 
     # Split train/test data
     df_train = df_select[:'2019-12-31']
@@ -107,8 +127,10 @@ def main():
     y_pred = model.predict(X_test_tensor)
 
     # Scatter plot of predictions vs true values
+    y_test_unscaled = scaler_dict['load'].inverse_transform(y_test_tensor)
+    y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
     plt.figure()
-    plt.scatter(y_test_tensor, y_pred)
+    plt.scatter(y_test_unscaled, y_pred_unscaled)
     plt.xlabel('True Load')
     plt.ylabel('Predicted Load')
     plt.show()
