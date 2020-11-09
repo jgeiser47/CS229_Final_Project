@@ -10,6 +10,7 @@ from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
+from calc_metrics import calc_metrics
 
 def scale_columns(df, col_name_list):
     """Scale columns named in col_name_list to mean zero, sd one,
@@ -113,31 +114,25 @@ def main():
     X_test = df_test.drop('load', axis=1).to_numpy()
 
     # Train model and predict
-    window = 24
-    memory_layer_units = 10
-    training_epochs = 30
-    X_train_tensor = create_window_data(X_train, window = window)
-    y_train_tensor = create_window_data(y_train, window = window, keep_whole_window=False)
+    hyperparams = {}
+    hyperparams['window'] = 24
+    hyperparams['mem_layer_units'] = 10
+    hyperparams['epochs'] = 1
+    X_train_tensor = create_window_data(X_train, window = hyperparams['window'])
+    y_train_tensor = create_window_data(y_train, window = hyperparams['window'], keep_whole_window=False)
     
-    model = define_vanilla_lstm(window = window, num_features = X_train.shape[1], units=memory_layer_units)
-    model.fit(X_train_tensor, y_train_tensor, epochs=training_epochs)
+    model = define_vanilla_lstm(window = hyperparams['window'], num_features = X_train.shape[1], units=hyperparams['mem_layer_units'])
+    model.fit(X_train_tensor, y_train_tensor, epochs=hyperparams['epochs'])
 
-    X_test_tensor = create_window_data(X_test, window = window)
-    y_test_tensor = create_window_data(y_test, window = window, keep_whole_window=False)
+    X_test_tensor = create_window_data(X_test, window = hyperparams['window'])
+    y_test_tensor = create_window_data(y_test, window = hyperparams['window'], keep_whole_window=False)
     y_pred = model.predict(X_test_tensor)
 
-    # Scatter plot of predictions vs true values
+    # Calculate metrics
     y_test_unscaled = scaler_dict['load'].inverse_transform(y_test_tensor)
     y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
-    plt.figure()
-    plt.scatter(y_test_unscaled, y_pred_unscaled)
-    plt.xlabel('True Load')
-    plt.ylabel('Predicted Load')
-    plt.show()
-    
-    # Error statistics
-    MSE = mean_squared_error(y_test_tensor, y_pred)
-    print(f'Mean Squared Error: {MSE:.2f}')
+    dates_arr = df_test.index[hyperparams['window']:]
+    calc_metrics(y_test_unscaled, y_pred_unscaled, dates_arr, hyperparams, save_outputs=True) 
 
     return
 
