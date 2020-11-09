@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import scale
+from sklearn.preprocessing import StandardScaler
 
 
 def create_window_data(data, window, keep_whole_window=True):
@@ -51,7 +51,8 @@ def define_vanilla_lstm(window, num_features, units):
     Returns: keras Sequential model object
     """
     model = keras.models.Sequential()
-    model.add(keras.layers.LSTM(units, input_shape=(window, num_features)))
+    model.add(keras.layers.LSTM(units, return_sequences=True, input_shape=(window, num_features)))
+    model.add(keras.layers.LSTM(units))
     model.add(keras.layers.Dense(1))
     model.compile(optimizer='adam', loss='mse')
 
@@ -68,22 +69,29 @@ def main():
     filepath = os.path.join(data_dir, f'{region}_{city}_third_pass.csv')
     df = pd.read_csv(filepath)
     
-    # Split train/test data
+    # Create datetime index
     df.index = pd.to_datetime(df.date_hour)
-    df_train = df[:'2019-12-31']
-    df_test = df['2020-01-01':'2020-03-01']
+    input_keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend', 'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load']
+    df_select = df.loc[:,input_keep_cols]
+
+    # Scale the data
+    float_cols = list(df_select.columns[df_select.dtypes==np.float64])
+    float_scaler = StandardScaler(copy=False)
+    float_scaler.fit(df_select.loc[:, float_cols])
+    df_select.loc[:, float_cols] = float_scaler.transform(df_select.loc[:, float_cols])
+
+    # Split train/test data
+    df_train = df_select[:'2019-12-31']
+    df_test = df_select['2020-01-01':'2020-03-01']
 
     # Select data columns for the RNN
-    input_keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend', 'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc']
     y_train = df_train['load'].to_numpy()
     y_train= np.expand_dims(y_train, axis=1)
-    X_train = df_train[input_keep_cols].to_numpy()
-    X_train = scale(X_train, axis=0)
+    X_train = df_train.drop('load', axis=1).to_numpy()
     y_test = df_test['load'].to_numpy()
     y_test= np.expand_dims(y_test, axis=1)
-    X_test = df_test[input_keep_cols].to_numpy()
-    X_test = scale(X_train, axis=0)
-    
+    X_test = df_test.drop('load', axis=1).to_numpy()
+
     # Train model and predict
     window = 24
     memory_layer_units = 10
