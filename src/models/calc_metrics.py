@@ -14,26 +14,27 @@ import json
 from matplotlib import pyplot as plt
 from sklearn import linear_model
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn import metrics
 
 def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
     '''
     Calculates some metrics and plots for current run of an LSTM and saves them
-    to a folder under the models subdirectory
+    to a folder under the root/models subdirectory
 
     Parameters
     ----------
-    y_true : numpy array of shape (m,1) with true load values
-        DESCRIPTION.
-    y_pred : numpy array of shape (m,1) with predicted load values
-        DESCRIPTION.
-    dates_arr : numpy array of shape (m,1) with date_hour strings
-        DESCRIPTION.
-    hyperparams : dictionary containing hyperparameter specifications
-        DESCRIPTION.
+    y_true : numpy array of shape (m,1)
+        True true load values
+    y_pred : numpy array of shape (m,1)
+        Predicted load values
+    dates_arr : numpy array of shape (m,1) 
+        Each entry in numpy array should contain a unique date_hour string in
+        the format: 'YYYY-MM-DD HH:MM:SS'
+    hyperparams : dictionary 
+        Contains hyperparameter specifications
     save_outputs : bool, optional
-        DESCRIPTION. If True, will save outputs to a generated directory under
-                     the root/models subdirectory
+        If True, will save outputs to a generated timestamped directory under
+        the root/models subdirectory
 
     Returns
     -------
@@ -53,17 +54,32 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
         os.mkdir(output_dir)
     
     # Error statistics #######################################################
-    MSE = mean_squared_error(y_true, y_pred)
-    R2_score = r2_score(y_true, y_pred)
     
-    print(f'Mean Squared Error: {MSE:.2f}')
-    print(f'R2 Score: {R2_score:.3f}')
+    # https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
+        
+    MSE = metrics.mean_squared_error(y_true, y_pred)
+    RMSE = metrics.mean_squared_error(y_true, y_pred, squared=False)
+    
+    Mean_abs_error = metrics.mean_absolute_error(y_true, y_pred)
+    Median_abs_error = metrics.median_absolute_error(y_true, y_pred)
+    
+    Max_error = metrics.max_error(y_true, y_pred)
+    R2_score = metrics.r2_score(y_true, y_pred)
+    
+    metrics_str = ''
+    metrics_str += f'Mean Squared Error: {MSE:.2f}\n'
+    metrics_str += f'Root Mean Squared Error: {RMSE:.2f}\n'
+    metrics_str += f'Mean Absolute Error: {Mean_abs_error:.2f}\n'
+    metrics_str += f'Median Absolute Error: {Median_abs_error:.2f}\n'
+    metrics_str += f'Max Error: {Max_error:.2f}\n'
+    metrics_str += f'R2 Score: {R2_score:.3f}\n'
+    
+    print(metrics_str)
     
     if save_outputs:
         filename = 'error_stats.txt'
         with open(os.path.join(output_dir,filename), 'w') as f:
-            f.write(f'Mean Squared Error: {MSE:.2f}\n')
-            f.write(f'R2 Score: {R2_score:.3f}')
+            f.write(metrics_str)
     
     # Scatter plot of Predicted vs True Load #################################
     plt.figure()
