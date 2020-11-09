@@ -17,28 +17,19 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 def get_datetime(dt_str):
     
-    # year = int(dt_str.split('-')[0])
-    # month = int(dt_str.split('-')[1])
-    # day = int(dt_str.split('-')[2].split(' ')[0])
-    
-    # hour = int(dt_str.split(' ')[1].split(':')[0])
-    # minute = 0
-    # second = 0
-    
     dt_obj = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
     
     return dt_obj
 
-def to_dt(dt_dataframe):
+def to_dt(dt_arr):
     
-    N = len(dt_dataframe)
+    N = len(dt_arr)
     
     return_arr = [''] * N
     
     j = 0
-    #for i in range(N):
-    for i in dt_dataframe.index:
-        return_arr[j] = get_datetime(dt_dataframe[i])
+    for i in range(N):
+        return_arr[j] = get_datetime(dt_arr[i])
         j+=1
     
     return return_arr
@@ -77,7 +68,7 @@ def get_data(data_dir, region, city):
     y = y[:slice_index]
     
     # Also need the dates range for plotting timeseries
-    dates_range_test = df['date_hour'][slice_index+start_index:end_index]
+    dates_range_test = np.array(df['date_hour'][slice_index+start_index:end_index])
     
     return X, y, X_test, y_test, dates_range_test
 
