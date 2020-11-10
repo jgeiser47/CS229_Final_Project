@@ -16,7 +16,8 @@ from sklearn import linear_model
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 
-def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
+def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True, 
+                 train_y_true=None, train_y_pred=None, train_dates_arr=None):
     '''
     Calculates some metrics and plots for current run of an LSTM and saves them
     to a folder under the root/models subdirectory
@@ -42,9 +43,11 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
 
     '''
     
+    output_dir = '' # Placeholder if save_outputs is False
+    
     if save_outputs:
         # Path to data directory contaning CSVs 
-        output_dir = os.path.join(os.getcwd(), '..', '..', 'models')
+        output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'models')
         output_dir = os.path.abspath(output_dir)
         
         # Current date/time
@@ -55,8 +58,47 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
     
     # Error statistics #######################################################
     
-    # https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
+    raw_metrics(y_true, y_pred, output_dir, save_outputs=save_outputs, prefix='val')
+    if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
+        raw_metrics(train_y_true, train_y_pred, output_dir, save_outputs=save_outputs, prefix='train')
+    
+    # Scatter plot of Predicted vs True Load #################################
         
+    plot_scatter(y_true, y_pred, output_dir, save_outputs=save_outputs, prefix='val')
+    if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
+        plot_scatter(train_y_true, train_y_pred, output_dir, save_outputs=save_outputs, prefix='train')
+    
+    # Timeseries Plot (automatically only plots first two weeks of data) ######   
+        
+    plot_timeseries(y_true, y_pred, dates_arr, output_dir, save_outputs=save_outputs, prefix='val')
+    if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
+        plot_timeseries(train_y_true, train_y_pred, train_dates_arr, output_dir, save_outputs=save_outputs, prefix='train')
+        
+    # Save current run's hyperparameters to JSON file ########################
+    if save_outputs:
+        filename = 'hyperparameters.json'
+        with open(os.path.join(output_dir,filename), 'w') as f:
+            json.dump(hyperparams, f, indent=4)
+            
+    # Save arrays of predicted and true load value to CSV ####################
+    save_CSV(y_true, y_pred, dates_arr, output_dir, save_outputs=save_outputs, prefix='val')
+    if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
+        save_CSV(train_y_true, train_y_pred, train_dates_arr, output_dir, save_outputs=save_outputs, prefix='train')    
+    
+    return
+
+
+
+def raw_metrics(y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
+    '''
+    Various useful regression metrics, the following link is a helpful reference
+    https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
+    '''
+            
+    print('------------------------------------------------------------------')
+    print(f'{prefix} raw metrics')
+    print('------------------------------------------------------------------')
+    
     MSE = metrics.mean_squared_error(y_true, y_pred)
     RMSE = metrics.mean_squared_error(y_true, y_pred, squared=False)
     
@@ -77,11 +119,17 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
     print(metrics_str)
     
     if save_outputs:
-        filename = 'error_stats.txt'
+        filename = f'{prefix}_error_stats.txt'
         with open(os.path.join(output_dir,filename), 'w') as f:
             f.write(metrics_str)
     
-    # Scatter plot of Predicted vs True Load #################################
+    return
+
+def plot_scatter(y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
+    '''
+    Scatter plot of predicted vs true load, ideal is a line of slope 1
+    '''
+    
     plt.figure()
     plt.scatter(y_true, y_pred)
     plt.xlabel('True Load (MW)')
@@ -89,10 +137,17 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
     plt.title('Predicted vs True Load')
     
     if save_outputs:
-        filename = 'scatter.png'
+        filename = f'{prefix}_scatter.png'
         plt.savefig(os.path.join(output_dir,filename))
+        
+    return
+
+def plot_timeseries(y_true, y_pred, dates_arr, output_dir, save_outputs=True, prefix='val'):
+    '''
+    Timeseries plot of predicted/true load vs datetime to see how well the 
+    prediction values match the true curve
+    '''
     
-    # Timeseris Plot (automatically only plots first two weeks of data) ######
     dates_arr_plt = to_dt(dates_arr)
     
     plt.figure()
@@ -110,34 +165,40 @@ def calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True):
     plt.legend()
 
     if save_outputs:
-        filename = 'timeseries.png'
+        filename = f'{prefix}_timeseries.png'
         plt.savefig(os.path.join(output_dir,filename))    
         
-    # Save current run's hyperparameters to JSON file ########################
-    if save_outputs:
-        filename = 'hyperparameters.json'
-        with open(os.path.join(output_dir,filename), 'w') as f:
-            json.dump(hyperparams, f, indent=4)
-            
-    # Save arrays of predicted and true load value to CSV ####################
+    return
+
+def save_CSV(y_true, y_pred, dates_arr, output_dir, save_outputs=True, prefix='val'):
+    '''
+    Save CSV file of predicted and true load
+    '''
+    
     if save_outputs:
         dates_arr = np.reshape(dates_arr, (len(dates_arr),1))
         df_out = np.hstack([dates_arr, y_true, y_pred])
         
         header = ['date_hour', 'True Load', 'Predicted Load']
-        filename = 'prediction_array.csv'
+        filename = f'{prefix}_pred_array.csv'
         output_filepath = os.path.join(output_dir, filename)
         pd.DataFrame(df_out).to_csv(output_filepath, header=header, index=None)
     
     return
 
 def get_datetime(dt_str):
+    '''
+    Helper function to get a datetime object from a date_hour string
+    '''
     
     dt_obj = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
     
     return dt_obj
 
 def to_dt(dt_arr):
+    '''
+    Helper function to convert array of date_hour timestrings to datetime objects
+    '''
     
     N = len(dt_arr)
     
@@ -153,7 +214,7 @@ def to_dt(dt_arr):
 def main():
     
     # Path to data directory contaning CSVs 
-    data_dir = os.path.join(os.getcwd(), '..', '..', 'data', 'interim')
+    data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'interim')
     data_dir = os.path.abspath(data_dir)
     
     # For now, just run on one city at a time
@@ -183,12 +244,20 @@ def main():
     
     # Need 3 array inputs: true load, predicted load, and array of date_hour 
     # strings for the range of prediction
-    y_December_True = y_test
-    y_December_Pred = mdl.predict(X_test)
-    December_dates_arr = dates_range_test
+    y_true = y_test
+    y_pred = mdl.predict(X_test)
+    dates_arr = dates_range_test
+    
+    from copy import deepcopy
+    
+    # For optional train inputs (this example isn't real training data!!!!)
+    train_y_true = deepcopy(y_true[500:])
+    train_y_pred = deepcopy(y_pred[500:])
+    train_dates_arr = deepcopy(dates_arr[500:])
     
     # Calculate metrics
-    calc_metrics(y_December_True, y_December_Pred, December_dates_arr, hyperparams, save_outputs=True)
+    calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True, 
+                 train_y_true=train_y_true, train_y_pred=train_y_pred, train_dates_arr=train_dates_arr)
     
     return
 
