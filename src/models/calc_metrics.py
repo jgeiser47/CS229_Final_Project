@@ -200,6 +200,11 @@ def to_dt(dt_arr):
     Helper function to convert array of date_hour timestrings to datetime objects
     '''
     
+    # If already a list of datetime objects, just return the list
+    if isinstance(dt_arr[0], datetime.datetime):
+        return dt_arr
+    
+    # Other wise convert from strings to datetime objects
     N = len(dt_arr)
     
     return_arr = [''] * N
@@ -253,7 +258,7 @@ def main():
     # For optional train inputs (this example isn't real training data!!!!)
     train_y_true = deepcopy(y_true[500:])
     train_y_pred = deepcopy(y_pred[500:])
-    train_dates_arr = deepcopy(dates_arr[500:])
+    train_dates_arr = deepcopy(to_dt(dates_arr[500:]))
     
     # Calculate metrics
     calc_metrics(y_true, y_pred, dates_arr, hyperparams, save_outputs=True, 
