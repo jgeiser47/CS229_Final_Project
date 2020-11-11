@@ -17,7 +17,7 @@ from sklearn import metrics
 class LSTM_Model:
 
     def __init__(self, df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=30,
-                 activation="tanh"):
+                 activation="tanh", eval_splits=5):
         self.window = window
         self.layers = layers
         self.hidden_inputs = hidden_inputs
@@ -33,6 +33,7 @@ class LSTM_Model:
         self.model = None
         self.path = None
         self.date_array = None
+        self.eval_splits = eval_splits
 
     def scale_columns(self, col_name_list):
         """Scale columns named in col_name_list to mean zero, sd one,
@@ -111,7 +112,7 @@ class LSTM_Model:
 
     def train_test_split(self):
         # Create TimeSeriesSplitter
-        tscv = TimeSeriesSplit(n_splits=5)
+        tscv = TimeSeriesSplit(n_splits=self.eval_splits)
         X = self.df
 
         # Find X_train and X_compare
@@ -476,11 +477,12 @@ def main():
     # For now, just run on one city at a time
     region = 'ercot'
     city = 'houston'
+    data_dir = os.path.join(os.getcwd(), 'data', 'interim')
 
     # Train model and predict
     lstm = LSTM_Model(df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=30,
                       activation="tanh")
-    lstm.run_experiment(region, city, os.getcwd())
+    lstm.run_experiment(region, city, data_dir, test_on_split=True)
 
     return
 
