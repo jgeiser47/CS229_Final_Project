@@ -17,7 +17,7 @@ from sklearn import metrics
 class LSTM_Model:
 
     def __init__(self, df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=30,
-                 activation="tanh", eval_splits=5):
+                 activation="tanh", eval_splits=5, preserve_weights=False):
         self.window = window
         self.layers = layers
         self.hidden_inputs = hidden_inputs
@@ -34,6 +34,7 @@ class LSTM_Model:
         self.path = None
         self.date_array = None
         self.eval_splits = eval_splits
+        self.preserve_weights = preserve_weights
 
     def scale_columns(self, col_name_list):
         """Scale columns named in col_name_list to mean zero, sd one,
@@ -202,7 +203,8 @@ class LSTM_Model:
 
         print("Defining and Training Model")
         # Define Model
-        self.define_fit_vanilla_lstm()
+        if self.model is None or self.preserve_weights is False:
+            self.define_fit_vanilla_lstm()
 
         # Train Model
         self.model.fit(X_train_tensor, y_train_tensor, epochs=self.epochs)
@@ -262,7 +264,7 @@ class LSTM_Model:
         X_train_val = X_train.loc[~X_train.index.isin(X_test.index)]
 
         # Find exact X_val and X_test
-        tscv = TimeSeriesSplit(n_splits=3)
+        tscv = TimeSeriesSplit(n_splits=self.eval_splits)
         for train_index, test_index in tscv.split(X_train_val):
             X_train_2 = X_train_val.iloc[train_index]
             X_val_2 = X_train_val.iloc[test_index]
@@ -475,14 +477,15 @@ class LSTM_Model:
 
 def main():
     # For now, just run on one city at a time
-    region = 'ercot'
-    city = 'houston'
+    locations = [('ercot', 'houston'), ('isone', 'boston'), ('nyiso', 'nyc'), ('pjm', 'chicago'), ('spp', 'kck')]
     data_dir = os.path.join(os.getcwd(), 'data', 'interim')
 
     # Train model and predict
-    lstm = LSTM_Model(df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=30,
-                      activation="tanh")
-    lstm.run_experiment(region, city, data_dir, test_on_split=True)
+    lstm = LSTM_Model(df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
+                      activation="tanh", eval_splits=3, preserve_weights=True)
+    for region, city in locations:
+        print(f"Fitting on data from {region}, {city}")
+        lstm.run_experiment(region, city, data_dir, test_on_split=True)
 
     return
 
