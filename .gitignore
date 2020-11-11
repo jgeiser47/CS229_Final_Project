@@ -1,3 +1,4 @@
 # File types to ignore
 *.pyc
 *.DS_Store
+/model
