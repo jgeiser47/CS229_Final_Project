@@ -10,6 +10,12 @@ import os
 import pandas as pd
 import numpy as np
 
+REGION_CITY_MAPPING = {'caiso': 'la',
+                        'ercot': 'houston', 
+                        'isone': 'boston', 
+                        'nyiso': 'nyc', 
+                        'pjm'  : 'chicago', 
+                        'spp'  : 'kck'}
 
 def get_io_filepaths():
     '''
@@ -27,20 +33,13 @@ def get_io_filepaths():
     
     io_filepaths = []
     
-    mapping = {'caiso': 'la',
-               'ercot': 'houston', 
-               'isone': 'boston', 
-               'nyiso': 'nyc', 
-               'pjm'  : 'chicago', 
-               'spp'  : 'kck'}
-    
     # For output data
-    data_output_dir = os.path.join(os.getcwd(), '..', '..', 'data', 'interim')
+    data_output_dir = os.path.join(os.getcwd(), 'data', 'interim')
     data_output_dir = os.path.abspath(data_output_dir)
     
     # Generate a list containing tuples of input/output filepaths
-    for region in mapping.keys():
-        city = mapping[region]
+    for region in REGION_CITY_MAPPING.keys():
+        city = REGION_CITY_MAPPING[region]
         
         input_file = os.path.join(data_output_dir, f'{region}_{city}_second_pass.csv')
         output_file = os.path.join(data_output_dir, f'{region}_{city}_third_pass.csv')
@@ -84,6 +83,27 @@ def update_holiday_col(df_in):
     
     return df_in
 
+def add_region_flags(df, input_filepath):
+    """Add city/region flag columns to a dataset
+    
+    Args:
+        df: pandas dataframe containing data for a particular city
+        input_flepath: file path string containing the city/region
+            information
+
+    Returns: df with new flag columns for all possible cities/regions.
+        The city/region column corresponding to this dataset's region
+        is all ones, others are all zeros.
+    """
+    cur_region = os.path.basename(input_filepath).split('_')[0]
+    for region, city in REGION_CITY_MAPPING.items():
+        if region == cur_region:
+            cur_flag = 1
+        else:
+            cur_flag = 0
+        df[f'city_flag_{city}'] = cur_flag
+    return df
+
 def parse_third_pass(input_filepath, output_filepath):
     '''
     Parses through raw CSV dataset and writes it into a more usable CSV format.
@@ -114,6 +134,9 @@ def parse_third_pass(input_filepath, output_filepath):
     
     # Remove unneeded features
     df_in = remove_cols(df_in)
+
+    # Add region/city flag columns
+    df_in = add_region_flags(df_in, input_filepath)
     
     # Get the first row that contains non-null values for all columns
     # Uses the cum_avg_7_day_load column as reference
