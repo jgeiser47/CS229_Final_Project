@@ -140,7 +140,9 @@ class LSTM_Model:
 
     def run_experiment(self, region, city, path, test_on_split=False,
                        input_keep_cols=['hour', 'weekday', 'weekend', 'pre_weekend',
-                                        'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load']):
+                                        'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
+                                        'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
+                                        'city_flag_chicago', 'city_flag_kck']):
         # Read appropriate CSV into a dataframe
         filepath = os.path.join(path, f'{region}_{city}_third_pass.csv')
         df = pd.read_csv(filepath)
