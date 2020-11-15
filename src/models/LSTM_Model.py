@@ -298,13 +298,6 @@ class LSTM_Model:
 
     #         self.calc_metrics(y_pred_unscaled, y_compare_unscaled)
 
-    def hyperparameter_dict(self, output_dir):
-        hyperparams = {"window": self.window, "layers": self.layers, "hidden_inputs": self.hidden_inputs,
-                       "epochs": self.epochs}
-        filename = 'hyperparameters.json'
-        with open(os.path.join(output_dir, filename), 'w') as f:
-            json.dump(hyperparams, f, indent=4)
-
     def test_on_splits(self, scaler_dict, folds = 6):
         tscv = TimeSeriesSplit(n_splits=5)
         X = self.df
@@ -492,6 +485,13 @@ class LSTM_Model:
                 self.test_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
 
         return
+
+    def hyperparameter_dict(self, output_dir):
+        hyperparams = {"window": self.window, "layers": self.layers, "hidden_inputs": self.hidden_inputs,
+                       "epochs": self.epochs}
+        filename = 'hyperparameters.json'
+        with open(os.path.join(output_dir, filename), 'w') as f:
+            json.dump(hyperparams, f, indent=4)
 
     def plot_scatter(self, y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
         '''
