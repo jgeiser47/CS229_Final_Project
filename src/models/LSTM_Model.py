@@ -35,6 +35,11 @@ class LSTM_Model:
         self.date_array = None
         self.eval_splits = eval_splits
         self.preserve_weights = preserve_weights
+        self.train_errors = []
+        self.val_errors = []
+        self.test_errors = []
+        self.outputpath = None
+        self.train_samples = []
 
     def scale_columns(self, col_name_list):
         """Scale columns named in col_name_list to mean zero, sd one,
@@ -73,14 +78,14 @@ class LSTM_Model:
         (num_steps, window [or 1 if keep_whole_window is False], num_features)
         ready for input to an LSTM.
         """
-        num_steps = data.shape[0] - self.window
+        num_steps = data.shape[0] - self.window + 1
         num_features = data.shape[1]
         if keep_whole_window is False:
             keep_nelems = 1
         else:
             keep_nelems = self.window
         arr = np.zeros((num_steps, keep_nelems, num_features))
-        for i in range(self.window, num_steps):
+        for i in range(self.window, data.shape[0]+1):
             cur_window = data[(i - keep_nelems):i, :]
             arr[i - self.window, :, :] = cur_window
         arr = arr.squeeze()
@@ -105,7 +110,7 @@ class LSTM_Model:
             for i in range(self.layers):
                 model.add(keras.layers.LSTM(self.hidden_inputs, activation=self.activation, return_sequences=True,
                                             input_shape=(self.window, num_features)))
-            model.add(keras.layers.LSTM(self.hidden_inputs), activation=self.activation)
+            model.add(keras.layers.LSTM(self.hidden_inputs , activation=self.activation))
         if self.last_layer == "Dense":
             model.add(keras.layers.Dense(1))
         model.compile(optimizer='adam', loss='mse')
@@ -138,7 +143,7 @@ class LSTM_Model:
         self.X_val = X_val_2
         self.X_compare = X_compare_2020
 
-    def run_experiment(self, region, city, path, test_on_split=False,
+    def run_experiment(self, region, city, path, test_on_split=False, folds = 6,
                        input_keep_cols=['hour', 'weekday', 'weekend', 'pre_weekend',
                                         'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
                                         'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
@@ -152,6 +157,7 @@ class LSTM_Model:
         print("Made DataFrame")
         # Create datetime index
         df.index = pd.to_datetime(df.date_hour)
+        print(df.columns)
         df_select = df.loc[:, input_keep_cols]
 
         # Set df to extracted dataset
@@ -164,7 +170,7 @@ class LSTM_Model:
         print("Splitting and Training")
         # Split train and test data
         if test_on_split:
-            self.test_on_splits(scaler_dict)
+            self.test_on_splits(scaler_dict, folds)
         else:
             self.train_test_split()
             self.fit_model_and_predict(scaler_dict)
@@ -172,14 +178,14 @@ class LSTM_Model:
     def fit_model_and_predict(self, scaler_dict, train_too=False):
         # Split data into input and target variables and create tensors
         # For Train data
-        date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window:].index.values)]
+        date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window-1:].index.values)]
         X_train = self.X_train
         y_train = X_train["load"].to_numpy()
         y_train = np.expand_dims(y_train, axis=1)
         X_train = X_train.drop("load", axis=1).to_numpy()
         X_train_tensor = self.create_window_data(X_train)
         y_train_tensor = self.create_window_data(y_train, keep_whole_window=False)
-
+        self.train_samples.append(len(X_train_tensor))
         # For test Data
         X_test = self.X_test
         y_test = X_test['load'].to_numpy()
@@ -195,7 +201,8 @@ class LSTM_Model:
         X_val = X_val.drop('load', axis=1).to_numpy()
         X_val_tensor = self.create_window_data(X_val)
         y_val_tensor = self.create_window_data(y_val, keep_whole_window=False)
-
+        if train_too:
+            assert round(100 * len(y_val_tensor)/ (len(y_val_tensor) + len(y_train_tensor))) == 20
         # For Compare Data
         X_compare = self.X_compare
         y_compare = X_compare['load'].to_numpy()
@@ -218,18 +225,17 @@ class LSTM_Model:
         y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
         if train_too:
             # Find unscaled data and calculate metrics
-            date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window:].index.values)]
-            date_array_train = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_train.iloc[self.window:].index.values)]
+            date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window-1:].index.values)]
+            date_array_train = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_train.iloc[self.window-1:].index.values)]
 
             y_pred_train = self.model.predict(X_train_tensor)
             y_train_unscaled = scaler_dict['load'].inverse_transform(y_train_tensor)
             y_pred_train_unscaled = scaler_dict['load'].inverse_transform(y_pred_train)
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, save_outputs=True,
+            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, scaler_dict,save_outputs=True,
                               train_y_true=y_train_unscaled,
-                              train_y_pred=y_pred_train_unscaled, train_dates_arr=date_array_train)
+                              train_y_pred=y_pred_train_unscaled, train_dates_arr=date_array_train, swoth = True)
         else:
-
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, save_outputs=True)
+            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, scaler_dict,save_outputs=True)
 
     #         #Find unscaled data and calculate metrics
     #         y_pred = self.model.predict(X_test_tensor)
@@ -251,7 +257,7 @@ class LSTM_Model:
         with open(os.path.join(output_dir, filename), 'w') as f:
             json.dump(hyperparams, f, indent=4)
 
-    def test_on_splits(self, scaler_dict):
+    def test_on_splits(self, scaler_dict, folds = 6):
         tscv = TimeSeriesSplit(n_splits=5)
         X = self.df
 
@@ -265,23 +271,45 @@ class LSTM_Model:
 
         # Find X_val+train
         X_train_val = X_train.loc[~X_train.index.isin(X_test.index)]
-
+        train_sample_size = []
         # Find exact X_val and X_test
-        tscv = TimeSeriesSplit(n_splits=self.eval_splits)
-        for train_index, test_index in tscv.split(X_train_val):
-            X_train_2 = X_train_val.iloc[train_index]
-            X_val_2 = X_train_val.iloc[test_index]
+        train_ind, test_ind = self.split_for_splits(folds, X_train_val)
+        for i in range(len(train_ind)):
+            X_train_2 = X_train_val.iloc[:train_ind[i]]
+            X_val_2 = X_train_val.iloc[train_ind[i]: train_ind[i] + test_ind[i]]
             self.X_train = X_train_2
+            train_sample_size.append(len(X_train_2))
             self.X_test = X_test
             self.X_val = X_val_2
             self.X_compare = X_compare_2020
             self.fit_model_and_predict(scaler_dict, train_too=True)
 
-    def calc_metrics(self, y_true, y_pred, dates_arr, save_outputs=True,
-                     train_y_true=None, train_y_pred=None, train_dates_arr=None):
+        filename_l = ["MSE","RMSE","MAPE","MSE_Scaled","RMSE_Scaled","MAPE_Scaled"]
+        for i in range(len(filename_l)):
+            train_error = [self.train_errors[j][i] for j in range(len(self.train_errors))]
+            val_error = [self.val_errors[j][i] for j in range(len(self.val_errors))]
+            plt.figure()
+            plt.plot(self.train_samples, train_error,label="training error")
+            plt.plot(self.train_samples, val_error, label="validation error")
+            plt.legend()
+            plt.xlabel("Training Size (Number of Windows)")
+            plt.ylabel("Error")
+            plt.title("{0} vs Training Size".format(filename_l))
+            filename = 'error_scatter_test_splits_{0}.png'.format(filename_l[i])
+            plt.savefig(os.path.join(self.outputpath, filename))
+            plt.close()
+
+
+    def split_for_splits(self, folds, data):
+        nsplits_len_train = [i * (len(data)-23) // (folds + 1) + (len(data)-23) % (folds + 1) - 1 if i* (len(data)-23) // (folds + 1) <= int(0.8 * (len(data)-23) // 1) else int(0.8*(len(data)-23)) for i in np.arange(1, folds+1)]
+        nsplits_len_test = [int((i -23) / 0.8 * 0.2 // 1) + 23 for i in nsplits_len_train]
+        return nsplits_len_train, nsplits_len_test
+
+    def calc_metrics(self, y_true, y_pred, dates_arr, scaler_dict,save_outputs=True,
+                     train_y_true=None, train_y_pred=None, train_dates_arr=None, swoth = False):
         '''
         Calculates some metrics and plots for current run of an LSTM and saves them
-        to a folder under the root/models subdirectory
+        to a folder under the root/models s ubdirectory
         Parameters
         ----------
         y_true : numpy array of shape (m,1)
@@ -302,7 +330,6 @@ class LSTM_Model:
         '''
 
         output_dir = ''  # Placeholder if save_outputs is False
-
         if save_outputs:
             path = os.path.join(os.getcwd(), "model")
             if not os.path.exists(path):
@@ -313,17 +340,25 @@ class LSTM_Model:
             # Path to data directory contaning CSVs
             output_dir = path
 
-            # Current date/time
             run_datetime = datetime.datetime.now().strftime('%m%d%y_%H%M%S')
             new_dir_name = f'run_{run_datetime}'
+
+            if swoth:
+                output_dir = os.path.join(output_dir, 'split_train_val')
+                if not os.path.exists(output_dir):
+                    os.mkdir(output_dir)
+                self.outputpath = output_dir
+            else:
+                pass
+            # Current date/time
             output_dir = os.path.join(output_dir, new_dir_name)
             os.mkdir(output_dir)
 
         # Error statistics #######################################################
-
-        self.raw_metrics(y_true, y_pred, output_dir, save_outputs=save_outputs, prefix='val')
+        # self.outputpath = output_dir
+        self.raw_metrics(y_true, y_pred, output_dir, scaler_dict, save_outputs=save_outputs, prefix='val', swoth = swoth)
         if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
-            self.raw_metrics(train_y_true, train_y_pred, output_dir, save_outputs=save_outputs, prefix='train')
+            self.raw_metrics(train_y_true, train_y_pred, output_dir, scaler_dict ,save_outputs=save_outputs, prefix='train',swoth = swoth)
 
         # Scatter plot of Predicted vs True Load #################################
 
@@ -348,7 +383,7 @@ class LSTM_Model:
 
         return
 
-    def raw_metrics(self, y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
+    def raw_metrics(self, y_true, y_pred, output_dir, scaler_dict,save_outputs=True, prefix='val', swoth = False):
         '''
         Various useful regression metrics, the following link is a helpful reference
         https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
@@ -358,6 +393,7 @@ class LSTM_Model:
         print(f'{prefix} raw metrics')
         print('------------------------------------------------------------------')
 
+        #UnScaled
         MSE = metrics.mean_squared_error(y_true, y_pred)
         RMSE = metrics.mean_squared_error(y_true, y_pred, squared=False)
 
@@ -367,6 +403,19 @@ class LSTM_Model:
         Max_error = metrics.max_error(y_true, y_pred)
         R2_score = metrics.r2_score(y_true, y_pred)
 
+        y_true_mape = y_true.reshape(len(y_true), 1)
+        MAPE = (sum(abs(y_true_mape - y_pred) / y_true_mape) / len(y_true_mape))[0]
+
+        #Scaled
+        y_true_scaled = scaler_dict["load"].transform(y_true.reshape(-1, 1))
+        y_pred_scaled = scaler_dict["load"].transform(y_pred.reshape(-1, 1))
+        MSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled)
+        RMSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled, squared=False)
+
+
+        y_true_scaled = y_true.reshape(len(y_true_scaled),1)
+        MAPE_scaled = (sum(abs(y_true_scaled - y_pred_scaled)/y_true_scaled)/len(y_true_scaled))[0]
+
         metrics_str = ''
         metrics_str += f'Mean Squared Error: {MSE:.2f}\n'
         metrics_str += f'Root Mean Squared Error: {RMSE:.2f}\n'
@@ -374,6 +423,10 @@ class LSTM_Model:
         metrics_str += f'Median Absolute Error: {Median_abs_error:.2f}\n'
         metrics_str += f'Max Error: {Max_error:.2f}\n'
         metrics_str += f'R2 Score: {R2_score:.3f}\n'
+        metrics_str += f'Mean Absolute Percentage Error (MAPE): {MAPE:.4f}\n'
+        metrics_str += f'Mean Squared Error Scaled: {MSE_scaled:.2f}\n'
+        metrics_str += f'Root Mean Squared Error Scaled: {RMSE_scaled:.2f}\n'
+        metrics_str += f'Mean Absolute Percentage Error Scaled: {MAPE_scaled:.4f}\n'
 
         print(metrics_str)
 
@@ -381,6 +434,14 @@ class LSTM_Model:
             filename = f'{prefix}_error_stats.txt'
             with open(os.path.join(output_dir, filename), 'w') as f:
                 f.write(metrics_str)
+
+        if swoth:
+            if prefix == "val":
+                self.val_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
+            elif prefix == "train":
+                self.train_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
+            elif prefix == "test":
+                self.test_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
 
         return
 
@@ -484,11 +545,11 @@ def main():
     data_dir = os.path.join(os.getcwd(), 'data', 'interim')
 
     # Train model and predict
-    lstm = LSTM_Model(df=None, window=24, layers=1, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
-                      activation="tanh", eval_splits=3, preserve_weights=True)
+    lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
+                      activation="relu", preserve_weights=True)
     for region, city in locations:
         print(f"Fitting on data from {region}, {city}")
-        lstm.run_experiment(region, city, data_dir, test_on_split=True)
+        lstm.run_experiment(region, city, data_dir, test_on_split=True, folds=7)
 
     return
 
