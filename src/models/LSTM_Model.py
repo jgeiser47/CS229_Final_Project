@@ -234,13 +234,6 @@ class LSTM_Model:
         X_train_tensor = self.create_window_data(X_train)
         y_train_tensor = self.create_window_data(y_train, keep_whole_window=False)
         self.train_samples.append(len(X_train_tensor))
-        # For test Data
-        X_test = self.X_test
-        y_test = X_test['load'].to_numpy()
-        y_test = np.expand_dims(y_test, axis=1)
-        X_test = X_test.drop('load', axis=1).to_numpy()
-        X_test_tensor = self.create_window_data(X_test)
-        y_test_tensor = self.create_window_data(y_test, keep_whole_window=False)
 
         # For Validation Data
         X_val = self.X_val
@@ -251,13 +244,6 @@ class LSTM_Model:
         y_val_tensor = self.create_window_data(y_val, keep_whole_window=False)
         if train_too:
             assert round(100 * len(y_val_tensor)/ (len(y_val_tensor) + len(y_train_tensor))) == 20
-        # For Compare Data
-        X_compare = self.X_compare
-        y_compare = X_compare['load'].to_numpy()
-        y_compare = np.expand_dims(y_compare, axis=1)
-        X_compare = X_compare.drop("load", axis=1).to_numpy()
-        X_compare_tensor = self.create_window_data(X_compare)
-        y_compare_tensor = self.create_window_data(y_compare, keep_whole_window=False)
 
         print("Defining and Training Model")
         # Define Model
