@@ -151,33 +151,6 @@ class LSTM_Model:
         model.compile(optimizer='adam', loss='mse')
         self.model = model
 
-    def train_test_split(self):
-        # Create TimeSeriesSplitter
-        tscv = TimeSeriesSplit(n_splits=self.eval_splits)
-        X = self.df
-
-        # Find X_train and X_compare
-        for train_index, test_index in tscv.split(X):
-            X_train = X.iloc[train_index]
-            X_compare_2020 = X.iloc[test_index]
-
-        # Find X_val+test
-        X_val = X_train.loc[(X_train.index.date > datetime.date(2019, 9, 30))]
-
-        # Find X_Train
-        X_train = X_train.loc[~X_train.index.isin(X_val.index)]
-
-        # Find exact X_val and X_test
-        tscv = TimeSeriesSplit(n_splits=2)
-        for train_index, test_index in tscv.split(X_val):
-            X_val_2 = X_val.iloc[train_index]
-            X_test_2_month = X_val.iloc[test_index]
-
-        self.X_train = X_train
-        self.X_test = X_test_2_month
-        self.X_val = X_val_2
-        self.X_compare = X_compare_2020
-
     def add_csv_data(self, city, dir, keep_cols, data_pass_name = 'third'):
         """Read CSV data from the 'third pass' format into a multi-indexed dataframe.csv
 
@@ -297,6 +270,33 @@ class LSTM_Model:
     #         y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
 
     #         self.calc_metrics(y_pred_unscaled, y_compare_unscaled)
+
+    def train_test_split(self):
+        # Create TimeSeriesSplitter
+        tscv = TimeSeriesSplit(n_splits=self.eval_splits)
+        X = self.df
+
+        # Find X_train and X_compare
+        for train_index, test_index in tscv.split(X):
+            X_train = X.iloc[train_index]
+            X_compare_2020 = X.iloc[test_index]
+
+        # Find X_val+test
+        X_val = X_train.loc[(X_train.index.date > datetime.date(2019, 9, 30))]
+
+        # Find X_Train
+        X_train = X_train.loc[~X_train.index.isin(X_val.index)]
+
+        # Find exact X_val and X_test
+        tscv = TimeSeriesSplit(n_splits=2)
+        for train_index, test_index in tscv.split(X_val):
+            X_val_2 = X_val.iloc[train_index]
+            X_test_2_month = X_val.iloc[test_index]
+
+        self.X_train = X_train
+        self.X_test = X_test_2_month
+        self.X_val = X_val_2
+        self.X_compare = X_compare_2020
 
     def test_on_splits(self, scaler_dict, folds = 6):
         tscv = TimeSeriesSplit(n_splits=5)
