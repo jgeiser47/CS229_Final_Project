@@ -24,6 +24,9 @@ class LSTM_Model:
         self.last_layer = last_layer
         self.scaler = scaler
         self.df = df
+        self.train_df = None
+        self.compare_df = None
+        self.test_df = None
         self.scaler_dict = {}
         self.epochs = epochs
         self.activation = activation
@@ -181,12 +184,36 @@ class LSTM_Model:
         self.df.sort_index(inplace=True)
         print(f'Added {city} to model dataframe')
 
+    def split_data_regimes(self, test_start = '2020-01-01 00:00:00', compare_start = '2020-03-01 00:00:00'):
+        """Split train/val, test, and compare data.
+        
+        Args:
+            test_start: string in pandas datetime format giving starting time (to hour)
+                of test dataset (e.g. '2020-01-01 00:00:00')
+            compare_start: string in pandas datetime format giving starting time (to hour)
+                of compare dataset (e.g. '2020-03-01 00:00:00')
+
+        Returns: None, but updates LSTM_Model attributes self.train_df, self.compare_df,
+            and self.test_df.
+        """
+        first_time = self.df.index.get_level_values('time').min()
+        last_time = self.df.index.get_level_values('time').max()
+        train_times = pd.date_range(start=first_time, end=test_start, freq='H', closed='left')
+        test_times = pd.date_range(start=test_start, end=compare_start, freq='H', closed='left')
+        compare_times = pd.date_range(start=compare_start, end = last_time, freq='H')
+        self.train_df = self.df.loc[(slice(None), train_times), :]
+        self.compare_df = self.df.loc[(slice(None), compare_times), :]
+        self.test_df = self.df.loc[(slice(None), test_times), :]
 
     def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
+        # Read, combine, and scale data
         self.add_csv_data(city, path, input_keep_cols)
         float_cols = list(self.df.columns[self.df.dtypes == np.float64])
         self.train_scaler(float_cols)
         self.df = self.apply_scaler(self.df)
+
+        # Split data into parts
+        self.split_data_regimes()
 
         print("Splitting and Training")
         # Split train and test data
