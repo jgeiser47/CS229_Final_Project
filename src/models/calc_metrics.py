@@ -103,6 +103,7 @@ def raw_metrics(y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
     RMSE = metrics.mean_squared_error(y_true, y_pred, squared=False)
     
     Mean_abs_error = metrics.mean_absolute_error(y_true, y_pred)
+    MAPE = (sum(abs(y_true-y_pred) / y_true) / len(y_true))[0]
     Median_abs_error = metrics.median_absolute_error(y_true, y_pred)
     
     Max_error = metrics.max_error(y_true, y_pred)
@@ -112,6 +113,7 @@ def raw_metrics(y_true, y_pred, output_dir, save_outputs=True, prefix='val'):
     metrics_str += f'Mean Squared Error: {MSE:.2f}\n'
     metrics_str += f'Root Mean Squared Error: {RMSE:.2f}\n'
     metrics_str += f'Mean Absolute Error: {Mean_abs_error:.2f}\n'
+    metrics_str += f'Mean Absolute Percentage Error (MAPE): {MAPE:.4f}\n'
     metrics_str += f'Median Absolute Error: {Median_abs_error:.2f}\n'
     metrics_str += f'Max Error: {Max_error:.2f}\n'
     metrics_str += f'R2 Score: {R2_score:.3f}\n'
