@@ -31,8 +31,6 @@ class LSTM_Model:
         self.X_val = None
         self.X_compare = None
         self.model = None
-        self.path = None
-        self.date_array = None
         self.eval_splits = eval_splits
         self.preserve_weights = preserve_weights
         self.train_errors = []
@@ -143,25 +141,43 @@ class LSTM_Model:
         self.X_val = X_val_2
         self.X_compare = X_compare_2020
 
+    def add_csv_data(self, city, dir, keep_cols, data_pass_name = 'third'):
+        """Read CSV data from the 'third pass' format into a multi-indexed dataframe.csv
+
+        Args:
+            city: city abbreviation used in the name of the csv file
+            dir: string file path to directory holding data files
+            keep_cols: list of column names to retain
+            data_pass_name: name of number of data pass type to use (e.g. use 'third'
+            to get one of the 'third_pass.csv' files.)
+
+        Returns: None, but row appends the dataframe to the model's self.df object.
+        """
+        # Get the desired file's path
+        file_list = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f))]
+        file_name = None
+        for f in file_list:
+            f_parts = f.split('_')
+            if f_parts[1] == city and f_parts[2] == data_pass_name:
+                file_name = f
+                break
+        
+        # Read the file and create indices
+        assert file_name is not None
+        df = pd.read_csv(os.path.join(dir, file_name))
+        df.index = pd.MultiIndex.from_arrays([[city] * len(df), pd.to_datetime(df.loc[:,'date_hour'])], names=['city', 'time'])
+        df = df.loc[:, keep_cols]
+        self.df = pd.concat([self.df, df], axis = 0)
+        print(f'Added {city} to model dataframe')
+
+
     def run_experiment(self, region, city, path, test_on_split=False, folds = 6,
                        input_keep_cols=['hour', 'weekday', 'weekend', 'pre_weekend',
                                         'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
                                         'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
                                         'city_flag_chicago', 'city_flag_kck', 'week_of_year', 'sin_week_of_year',
                                         'cos_week_of_year', 'sin_hour', 'cos_hour']):
-        # Read appropriate CSV into a dataframe
-        filepath = os.path.join(path, f'{region}_{city}_third_pass.csv')
-        df = pd.read_csv(filepath)
-        self.path = path
-        self.date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(df.date_hour)]
-        print("Made DataFrame")
-        # Create datetime index
-        df.index = pd.to_datetime(df.date_hour)
-        print(df.columns)
-        df_select = df.loc[:, input_keep_cols]
-
-        # Set df to extracted dataset
-        self.df = df_select
+        self.add_csv_data(city, path, input_keep_cols)
 
         # Scale the data
         float_cols = list(df_select.columns[df_select.dtypes == np.float64])
@@ -543,6 +559,12 @@ def main():
     # For now, just run on one city at a time
     locations = [('ercot', 'houston'), ('isone', 'boston'), ('nyiso', 'nyc'), ('pjm', 'chicago'), ('spp', 'kck')]
     data_dir = os.path.join(os.getcwd(), 'data', 'interim')
+
+    keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend',
+                'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
+                'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
+                'city_flag_chicago', 'city_flag_kck', 'week_of_year', 'sin_week_of_year',
+                'cos_week_of_year', 'sin_hour', 'cos_hour']
 
     # Train model and predict
     lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
