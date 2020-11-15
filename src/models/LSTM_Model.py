@@ -547,9 +547,11 @@ def main():
     # Train model and predict
     lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
                       activation="relu", preserve_weights=True)
-    for region, city in locations:
-        print(f"Fitting on data from {region}, {city}")
-        lstm.run_experiment(region, city, data_dir, test_on_split=True, folds=7)
+
+    lstm.run_experiment('ercot', 'houston', data_dir, test_on_split=True, folds=7)
+    #for region, city in locations:
+    #    print(f"Fitting on data from {region}, {city}")
+    #    lstm.run_experiment(region, city, data_dir, test_on_split=True, folds=7)
 
     return
 
