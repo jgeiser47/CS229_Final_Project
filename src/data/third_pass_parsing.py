@@ -9,6 +9,7 @@ Created on Fri Oct 30 15:26:59 2020
 import os
 import pandas as pd
 import numpy as np
+import datetime
 
 REGION_CITY_MAPPING = {'caiso': 'la',
                         'ercot': 'houston', 
@@ -103,6 +104,68 @@ def add_region_flags(df, input_filepath):
             cur_flag = 0
         df[f'city_flag_{city}'] = cur_flag
     return df
+def get_datetime(dt_str):
+    '''
+    Helper function to get a datetime object from a date_hour string
+    '''
+    
+    dt_obj = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
+    
+    return dt_obj
+
+def to_dt(dt_arr):
+    '''
+    Helper function to convert array of date_hour timestrings to datetime objects
+    '''
+    
+    # If already a list of datetime objects, just return the list
+    if isinstance(dt_arr[0], datetime.datetime):
+        return dt_arr
+    
+    # Other wise convert from strings to datetime objects
+    N = len(dt_arr)
+    
+    return_arr = [''] * N
+    
+    j = 0
+    for i in range(N):
+        return_arr[j] = get_datetime(dt_arr[i])
+        j+=1
+    
+    return return_arr
+
+def add_week_of_year(df_in):
+    '''
+    Adds week_of_year column to dataset. NOTE that this uses the ISO definition
+    for week 1 where week 1 is the week with the first Thursday in it. This may 
+    give some unexpected results near the beginning and end of a year. For 
+    example, 2020-01-01 falls in ISO week 52 of ISO year 1999. 
+    '''
+    
+    date_times = np.array(df_in['date_hour'])
+    
+    date_times = to_dt(date_times)
+    
+    week_nums = [x.isocalendar()[1] for x in date_times]
+    
+    df_in['week_of_year'] = week_nums
+    
+    return df_in
+
+def add_sin_cos_terms(df_in, col_name):
+    
+    time_arr = np.array(df_in[col_name])
+    
+    # Make zero indexed if not already
+    if min(time_arr) == 1:
+        time_arr -= 1
+    
+    max_val = max(time_arr)
+    
+    df_in[f'sin_{col_name}'] = np.sin(2 * np.pi * time_arr / max_val)
+    df_in[f'cos_{col_name}'] = np.cos(2 * np.pi * time_arr / max_val)
+    
+    return df_in
 
 def parse_third_pass(input_filepath, output_filepath):
     '''
@@ -131,6 +194,13 @@ def parse_third_pass(input_filepath, output_filepath):
     
     # Update holiday column so that all hours in a holiday contain 1
     df_in = update_holiday_col(df_in)
+    
+    # Add week of year column 
+    df_in = add_week_of_year(df_in)
+    
+    # Add sin/cos terms for hour column and week of year column
+    df_in = add_sin_cos_terms(df_in, 'week_of_year')
+    df_in = add_sin_cos_terms(df_in, 'hour')
     
     # Remove unneeded features
     df_in = remove_cols(df_in)
