@@ -168,6 +168,7 @@ class LSTM_Model:
         df.index = pd.MultiIndex.from_arrays([[city] * len(df), pd.to_datetime(df.loc[:,'date_hour'])], names=['city', 'time'])
         df = df.loc[:, keep_cols]
         self.df = pd.concat([self.df, df], axis = 0)
+        self.df.sort_index(inplace=True)
         print(f'Added {city} to model dataframe')
 
 
