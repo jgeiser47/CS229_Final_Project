@@ -191,10 +191,10 @@ class LSTM_Model:
         print("Splitting and Training")
         # Split train and test data
         if test_on_split:
-            self.test_on_splits(scaler_dict, folds)
+            self.test_on_splits(self.scaler_dict[city], folds)
         else:
             self.train_test_split()
-            self.fit_model_and_predict(scaler_dict)
+            self.fit_model_and_predict(self.scaler_dict[city])
 
     def fit_model_and_predict(self, scaler_dict, train_too=False):
         # Split data into input and target variables and create tensors
