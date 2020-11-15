@@ -171,12 +171,7 @@ class LSTM_Model:
         print(f'Added {city} to model dataframe')
 
 
-    def run_experiment(self, region, city, path, test_on_split=False, folds = 6,
-                       input_keep_cols=['hour', 'weekday', 'weekend', 'pre_weekend',
-                                        'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
-                                        'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
-                                        'city_flag_chicago', 'city_flag_kck', 'week_of_year', 'sin_week_of_year',
-                                        'cos_week_of_year', 'sin_hour', 'cos_hour']):
+    def run_experiment(self, region, city, path, test_on_split=False, folds = 6, input_keep_cols):
         self.add_csv_data(city, path, input_keep_cols)
 
         # Scale the data
@@ -570,7 +565,7 @@ def main():
     lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
                       activation="relu", preserve_weights=True)
 
-    lstm.run_experiment('ercot', 'houston', data_dir, test_on_split=True, folds=7)
+    lstm.run_experiment('ercot', 'houston', data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
     #for region, city in locations:
     #    print(f"Fitting on data from {region}, {city}")
     #    lstm.run_experiment(region, city, data_dir, test_on_split=True, folds=7)
