@@ -24,6 +24,7 @@ class LSTM_Model:
         self.last_layer = last_layer
         self.scaler = scaler
         self.df = df
+        self.scaler_dict = {}
         self.epochs = epochs
         self.activation = activation
         self.X_train = None
@@ -43,7 +44,6 @@ class LSTM_Model:
         """Scale columns named in col_name_list to mean zero, sd one,
         and return the individual scaler objects in a dictionary.
         Args:
-            df: pandas DataFrame with columns to be scaled
             col_name_list: list of string column names denoting columns
                 to be scaled
         Returns: Tuple of two objects. The first is the scaled dataframe.
@@ -61,7 +61,44 @@ class LSTM_Model:
             cur_scaler.fit(cur_data)
             self.df.loc[:, cur_name] = cur_scaler.transform(cur_data).squeeze()
             scaler_dict[cur_name] = cur_scaler
-        return (scaler_dict)
+        return scaler_dict
+
+    def train_scaler(self, cols_to_scale):
+        """Train scalers to scale down the columns of the dataframe individually
+        for each city.
+
+        Args:
+            cols_to_scale: names of columns to scale
+
+        Returns: None, but adds the scaler information to the self.scaler_dict
+        """
+        for city in self.df.index.get_level_values('city').unique():
+            self.scaler_dict[city] = {}
+            for col_name in cols_to_scale:
+                if self.scaler == "Standard":
+                    col_scaler = StandardScaler()
+                else:
+                    col_scaler = MinMaxScaler()
+                col_data = self.df.loc[(slice(city), slice(None)), col_name].values
+                col_data = np.expand_dims(col_data, axis=1)
+                col_scaler.fit(col_data)
+                self.scaler_dict[city][col_name] = col_scaler
+
+    def apply_scaler(self, df):
+        """Apply scaler stored in self.scaler_dict to a DataFrame
+
+        Args:
+            df: the dataframe to apply self.scaler_dict to.
+        Returns: a scaled version of df
+        """
+        for city in df.index.get_level_values('city').unique():
+            cur_dict = self.scaler_dict[city]
+            for col_name, col_scaler in cur_dict.items():
+                cur_data = df.loc[(slice(city), slice(None)), col_name].values
+                cur_data = np.expand_dims(cur_data, axis=1)
+                df.loc[(slice(city), slice(None)), col_name] = col_scaler.transform(cur_data)
+        return df
+
 
     def create_window_data(self, data, keep_whole_window=True):
         """Preprocess data to match RNN model specification
@@ -174,10 +211,9 @@ class LSTM_Model:
 
     def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
         self.add_csv_data(city, path, input_keep_cols)
-
-        # Scale the data
-        float_cols = list(df_select.columns[df_select.dtypes == np.float64])
-        scaler_dict = self.scale_columns(float_cols)
+        float_cols = list(self.df.columns[self.df.dtypes == np.float64])
+        self.train_scaler(float_cols)
+        self.df = self.apply_scaler(self.df)
 
         print("Splitting and Training")
         # Split train and test data
