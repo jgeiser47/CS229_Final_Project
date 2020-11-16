@@ -293,7 +293,7 @@ class LSTM_Model:
         Returns: df with new predicted column
         """
         df_return = df.loc[:, 'load'].to_frame()
-        df_return.assign(load_pred = np.NaN)
+        df_return = df_return.assign(load_pred = np.NaN)
         for city in df.index.get_level_values('city').unique():
             print(f'Predicting on {city} data')
             city_df = df.loc[(city, slice(None)), :]
