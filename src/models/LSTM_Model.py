@@ -210,7 +210,6 @@ class LSTM_Model:
         self.add_csv_data(city, path, input_keep_cols)
         float_cols = list(self.df.columns[self.df.dtypes == np.float64])
         self.train_scaler(float_cols)
-        self.df = self.apply_scaler(self.df)
 
         # Split data into parts
         self.split_data_regimes()
@@ -239,7 +238,7 @@ class LSTM_Model:
         # Split data by city and create windows
         for city in df.index.get_level_values('city').unique():
             print(f'Fitting on {city} data')
-            city_df = df.loc[city, :]
+            city_df = self.apply_scaler(df.loc[city, :])
 
             X = city_df.drop("load", axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
@@ -265,12 +264,14 @@ class LSTM_Model:
         df_return.assign(load_pred = np.NaN)
         for city in df.index.get_level_values('city').unique():
             print(f'Predicting on {city} data')
-            city_df = df.loc[city, :]
+            city_df = self.apply_scaler(df.loc[city, :])
 
             X = city_df.drop('load', axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
 
+            # Predict and unscale
             y_pred = self.model.predict(X_tensor)
+            y_pred = self.scaler_dict[city]['load'].inverse_transform(y_pred)
 
             # Assign values to the correct part of df_return
             window_start = city_df.index.get_level_values('time').min() + pd.Timedelta(f'{self.window - 1} hours')
