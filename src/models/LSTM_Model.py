@@ -251,6 +251,7 @@ class LSTM_Model:
         test = self.predict_model(self.train_df.loc[(slice(None), test_times), :])
         #TODO: Debug where apply_scaler changes data by reference, and check that we won't inadvertently apply scaling twice.
         essay = self.prep_eval_data(test)
+        self.calc_metrics(y_true=essay.loc[:,'load'], y_pred=essay.loc[:,'load_pred'], dates_arr=essay.index.get_level_values('time'))
 
         # Split train and test data
         if test_on_split:
@@ -314,67 +315,6 @@ class LSTM_Model:
             window_times = pd.date_range(start=window_start, end=window_end, freq='H')
             df_return.loc[(city, window_times), 'load_pred'] = y_pred
         return df_return
-
-    def fit_model_and_predict(self, scaler_dict, train_too=False):
-        # Split data into input and target variables and create tensors
-        # For Train data
-        date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window-1:].index.values)]
-        X_train = self.X_train
-        y_train = X_train["load"].to_numpy()
-        y_train = np.expand_dims(y_train, axis=1)
-        X_train = X_train.drop("load", axis=1).to_numpy()
-        X_train_tensor = self.create_window_data(X_train)
-        y_train_tensor = self.create_window_data(y_train, keep_whole_window=False)
-        self.train_samples.append(len(X_train_tensor))
-
-        # For Validation Data
-        X_val = self.X_val
-        y_val = X_val['load'].to_numpy()
-        y_val = np.expand_dims(y_val, axis=1)
-        X_val = X_val.drop('load', axis=1).to_numpy()
-        X_val_tensor = self.create_window_data(X_val)
-        y_val_tensor = self.create_window_data(y_val, keep_whole_window=False)
-        if train_too:
-            assert round(100 * len(y_val_tensor)/ (len(y_val_tensor) + len(y_train_tensor))) == 20
-
-        print("Defining and Training Model")
-        # Define Model
-        if self.model is None or self.preserve_weights is False:
-            self.define_fit_vanilla_lstm()
-
-        # Train Model
-        self.model.fit(X_train_tensor, y_train_tensor, epochs=self.epochs)
-
-        # Make Prediction
-        y_pred = self.model.predict(X_val_tensor)
-        y_val_unscaled = scaler_dict['load'].inverse_transform(y_val_tensor)
-        y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
-        if train_too:
-            # Find unscaled data and calculate metrics
-            date_array = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_val.iloc[self.window-1:].index.values)]
-            date_array_train = [i.strftime('%Y-%m-%d %H:%M:%S') for i in pd.to_datetime(self.X_train.iloc[self.window-1:].index.values)]
-
-            y_pred_train = self.model.predict(X_train_tensor)
-            y_train_unscaled = scaler_dict['load'].inverse_transform(y_train_tensor)
-            y_pred_train_unscaled = scaler_dict['load'].inverse_transform(y_pred_train)
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array,save_outputs=True,
-                              train_y_true=y_train_unscaled,
-                              train_y_pred=y_pred_train_unscaled, train_dates_arr=date_array_train, swoth = True)
-        else:
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, save_outputs=True)
-
-    #         #Find unscaled data and calculate metrics
-    #         y_pred = self.model.predict(X_test_tensor)
-    #         y_test_unscaled = scaler_dict['load'].inverse_transform(y_test_tensor)
-    #         y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
-    #         self.calc_metrics(y_pred_unscaled, y_test_unscaled)
-
-    #         #Find unscaled data and calculate metrics
-    #         y_pred = self.model.predict(X_compare_tensor)
-    #         y_compare_unscaled = scaler_dict['load'].inverse_transform(y_compare_tensor)
-    #         y_pred_unscaled = scaler_dict['load'].inverse_transform(y_pred)
-
-    #         self.calc_metrics(y_pred_unscaled, y_compare_unscaled)
 
     def train_test_split(self):
         # Create TimeSeriesSplitter
@@ -549,14 +489,7 @@ class LSTM_Model:
         Max_error = metrics.max_error(y_true, y_pred)
         R2_score = metrics.r2_score(y_true, y_pred)
 
-        y_true_mape = y_true.reshape(len(y_true), 1)
-        MAPE = (sum(abs(y_true_mape - y_pred) / y_true_mape) / len(y_true_mape))[0]
-
-        #Scaled
-        y_true_scaled = scaler_dict["load"].transform(y_true.reshape(-1, 1))
-        y_pred_scaled = scaler_dict["load"].transform(y_pred.reshape(-1, 1))
-        MSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled)
-        RMSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled, squared=False)
+        MAPE = ((np.abs(y_true - y_pred)/y_true).sum())/len(y_true)
 
         metrics_str = ''
         metrics_str += f'Mean Squared Error: {MSE:.2f}\n'
@@ -640,19 +573,11 @@ class LSTM_Model:
         '''
         Save CSV file of predicted and true load
         '''
-
         if save_outputs:
-            dates_arr = np.reshape(dates_arr, (len(dates_arr), 1))
-            y_true = y_true.reshape(len(y_true),1)
-            y_pred = y_pred.reshape(len(y_pred),1)
-            df_out = np.hstack([dates_arr, y_true, y_pred])
-
-            header = ['date_hour', 'True Load', 'Predicted Load']
+            df_out = y_true.to_frame().join(y_pred.to_frame())
             filename = f'{prefix}_pred_array.csv'
             output_filepath = os.path.join(output_dir, filename)
-            pd.DataFrame(df_out).to_csv(output_filepath, header=header, index=False)
-
-        return
+            pd.DataFrame(df_out).to_csv(output_filepath, index=True)
 
     def get_datetime(self, dt_str):
         '''
