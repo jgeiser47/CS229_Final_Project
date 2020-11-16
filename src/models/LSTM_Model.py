@@ -169,6 +169,7 @@ class LSTM_Model:
         """
         # Get the desired file's path
         file_list = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f))]
+        file_list.remove('.gitkeep')
         file_name = None
         for f in file_list:
             f_parts = f.split('_')
@@ -244,17 +245,10 @@ class LSTM_Model:
         # Split data into parts
         self.split_data_regimes()
 
-        print("Splitting and Training")
-        test_times = pd.date_range(start='2018-01-01', end='2018-02-01', freq='H')
-        self.fit_model(self.train_df.loc[(slice(None), test_times), :])
-        test = self.predict_model(self.train_df.loc[(slice(None), test_times), :])
-        #TODO: Debug where apply_scaler changes data by reference, and check that we won't inadvertently apply scaling twice.
-        essay = self.prep_eval_data(test)
-        self.calc_metrics(y_true=essay.loc[:,'load'], y_pred=essay.loc[:,'load_pred'], dates_arr=essay.index.get_level_values('time'))
-
         # Split train and test data
         if test_on_split:
-            self.test_on_splits(self.scaler_dict[city], folds)
+            test_times = pd.date_range(start='2018-01-01', end='2018-02-01', freq='H')
+            self.test_on_splits(self.train_df.loc[(slice(None), test_times), :], folds=folds)
         else:
             self.train_test_split()
 
@@ -341,52 +335,77 @@ class LSTM_Model:
         self.X_val = X_val_2
         self.X_compare = X_compare_2020
 
-    def test_on_splits(self, scaler_dict, folds = 6):
-        tscv = TimeSeriesSplit(n_splits=5)
-        X = self.df
+    def test_on_splits(self, df, folds = 6):
+        """Tests model fit on increasingly large subsets of the data, producing
+        the Andrew Ng "bias-variance diagnostic" graph.
+        
+        Args:
+            df: the dataframe to test over. It must have a MultiIndex like that
+            created by add_csv_data.
+            folds: number of testing points to calculate and plot
 
-        # Find X_train and X_compare
-        for train_index, test_index in tscv.split(X):
-            X_train = X.iloc[train_index]
-            X_compare_2020 = X.iloc[test_index]
-
-        # Find X_test
-        X_test = X_train.loc[(X_train.index.date > datetime.date(2019, 12, 31))]
-
-        # Find X_val+train
-        X_train_val = X_train.loc[~X_train.index.isin(X_test.index)]
-        train_sample_size = []
-        # Find exact X_val and X_test
-        train_ind, test_ind = self.split_for_splits(folds, X_train_val)
+        Returns: None, but saves plots and prints summary statistics as it runs.
+        
+        If multiple cities are present in df, then the training folds include an
+        equal proportion of data from each. Folds are determined by time, not
+        by city.
+        """
+        sample_sizes = []
+        start_time_train = df.index.get_level_values('time').min()
+        end_time_train = df.index.get_level_values('time').max()
+        num_hours = (end_time_train - start_time_train)/pd.Timedelta(hours=1) + 1
+        train_ind, test_ind = self.split_for_splits(folds, num_hours)
+        next_start_time_train = start_time_train
         for i in range(len(train_ind)):
-            X_train_2 = X_train_val.iloc[:train_ind[i]]
-            X_val_2 = X_train_val.iloc[train_ind[i]: train_ind[i] + test_ind[i]]
-            self.X_train = X_train_2
-            train_sample_size.append(len(X_train_2))
-            self.X_test = X_test
-            self.X_val = X_val_2
-            self.X_compare = X_compare_2020
-            self.fit_model_and_predict(scaler_dict, train_too=True)
+            # Set training date ranges, both cumulative (for testing), and incremental (for training)
+            end_time_train = start_time_train + pd.Timedelta(train_ind[i], 'h')
+            cumul_train_range = pd.date_range(start=start_time_train, end=end_time_train, freq='h')
+            increm_train_range = pd.date_range(start=next_start_time_train, end=end_time_train, freq='h')
+            next_start_time_train = end_time_train + pd.Timedelta(1, 'h')
 
+            # Set validation date range
+            start_time_val = end_time_train + pd.Timedelta(1, 'h')
+            end_time_val = start_time_val + pd.Timedelta(test_ind[i], 'h')
+            val_range = pd.date_range(start=start_time_val, end=end_time_val, freq='h')
+
+            # Fit on incremental training data
+            self.fit_model(df.loc[(slice(None), increm_train_range), :])
+
+            # Evaluate results on validation and cumulative training data
+            pred_train_df = self.predict_model(self.train_df.loc[(slice(None), cumul_train_range), :])
+            sample_sizes.append(len(pred_train_df))
+            pred_train_df = self.prep_eval_data(pred_train_df)
+            self.raw_metrics(y_true=pred_train_df.loc[:,'load'], y_pred=pred_train_df.loc[:, 'load_pred'], prefix='train', save_outputs=False, swoth=True)
+            pred_val_df = self.predict_model(self.train_df.loc[(slice(None), val_range), :])
+            pred_val_df = self.prep_eval_data(pred_val_df)
+            self.raw_metrics(y_true=pred_val_df.loc[:,'load'], y_pred=pred_val_df.loc[:, 'load_pred'], prefix='val', save_outputs=False, swoth=True)
+
+        # Run full metrics on final version
+        self.calc_metrics(y_true=pred_val_df.loc[:,'load'], y_pred=pred_val_df.loc[:, 'load_pred'], dates_arr=val_range,
+                            train_y_true=pred_train_df.loc[:,'load'], train_y_pred=pred_train_df.loc[:, 'load_pred'], train_dates_arr=cumul_train_range,
+                            swoth=True)
+
+        # Create bias-variance diagnostic plot
         filename_l = ["MSE","RMSE","MAPE"]
         for i in range(len(filename_l)):
             train_error = [self.train_errors[j][i] for j in range(len(self.train_errors))]
             val_error = [self.val_errors[j][i] for j in range(len(self.val_errors))]
             plt.figure()
-            plt.plot(self.train_samples, train_error,label="training error")
-            plt.plot(self.train_samples, val_error, label="validation error")
+            plt.plot(sample_sizes, train_error[:-1],label="training error")
+            plt.plot(sample_sizes, val_error[:-1], label="validation error")
             plt.legend()
             plt.xlabel("Training Size (Number of Windows)")
             plt.ylabel("Error")
-            plt.title("{0} vs Training Size".format(filename_l))
-            filename = 'error_scatter_test_splits_{0}.png'.format(filename_l[i])
-            plt.savefig(os.path.join(self.outputpath, filename))
+            plt.title(f"{filename_l[i]} vs Training Size")
+            filename = f'error_scatter_test_splits_{filename_l[i]}.png'
+            plt.savefig(os.path.join(os.getcwd(), "model", filename))
             plt.close()
 
 
-    def split_for_splits(self, folds, data):
-        nsplits_len_train = [i * (len(data)-23) // (folds + 1) + (len(data)-23) % (folds + 1) - 1 if i* (len(data)-23) // (folds + 1) <= int(0.8 * (len(data)-23) // 1) else int(0.8*(len(data)-23)) for i in np.arange(1, folds+1)]
-        nsplits_len_test = [int((i -23) / 0.8 * 0.2 // 1) + 23 for i in nsplits_len_train]
+    def split_for_splits(self, folds, length):
+        adj = self.window - 1
+        nsplits_len_train = [i * (length-adj) // (folds + 1) + (length-adj) % (folds + 1) - 1 if i* (length-adj) // (folds + 1) <= int(0.8 * (length-adj) // 1) else int(0.8*(length-adj)) for i in np.arange(1, folds+1)]
+        nsplits_len_test = [int((i - adj) / 0.8 * 0.2 // 1) + adj for i in nsplits_len_train]
         return nsplits_len_train, nsplits_len_test
 
     def calc_metrics(self, y_true, y_pred, dates_arr, save_outputs=True,
@@ -467,7 +486,7 @@ class LSTM_Model:
 
         return
 
-    def raw_metrics(self, y_true, y_pred, output_dir, save_outputs=True, prefix='val', swoth = False):
+    def raw_metrics(self, y_true, y_pred, output_dir=None, save_outputs=True, prefix='val', swoth = False):
         '''
         Various useful regression metrics, the following link is a helpful reference
         https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
@@ -623,7 +642,7 @@ def main():
     lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=1,
                       activation="relu", preserve_weights=True)
 
-    lstm.run_experiment(['houston', 'boston'], data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
+    lstm.run_experiment(cities, data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
     #for city in cities:
     #    print(f"Fitting on data from {city}")
     #    lstm.run_experiment(city, data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
