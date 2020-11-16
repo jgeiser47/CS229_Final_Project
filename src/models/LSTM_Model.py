@@ -97,10 +97,10 @@ class LSTM_Model:
         for city in df.index.get_level_values('city').unique():
             cur_dict = self.scaler_dict[city]
             for col_name, col_scaler in cur_dict.items():
-                cur_data = df.loc[city, col_name].to_numpy()
+                cur_data = df.loc[(city, slice(None)), col_name].to_numpy()
                 cur_data = np.expand_dims(cur_data, axis=1)
                 transformed = col_scaler.transform(cur_data)
-                df.loc[city, col_name] = transformed
+                df.loc[(city, slice(None)), col_name] = transformed
         return df
 
 
@@ -296,7 +296,7 @@ class LSTM_Model:
         df_return.assign(load_pred = np.NaN)
         for city in df.index.get_level_values('city').unique():
             print(f'Predicting on {city} data')
-            city_df = df.loc[city, :]
+            city_df = df.loc[(city, slice(None)), :]
 
             X = city_df.drop('load', axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
