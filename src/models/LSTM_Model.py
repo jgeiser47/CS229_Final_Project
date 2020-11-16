@@ -258,7 +258,6 @@ class LSTM_Model:
             self.test_on_splits(self.scaler_dict[city], folds)
         else:
             self.train_test_split()
-            self.fit_model_and_predict(self.scaler_dict[city])
 
     def fit_model(self, df):
         """Fit self.model to the passed data frame df, split by city to prevent problems
