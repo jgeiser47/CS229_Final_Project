@@ -280,7 +280,7 @@ class LSTM_Model:
             window_start = city_df.index.get_level_values('time').min() + pd.Timedelta(f'{self.window - 1} hours')
             window_end = city_df.index.get_level_values('time').max()
             window_times = pd.date_range(start=window_start, end=window_end, freq='H')
-            df_return.loc[(slice(city), window_times), 'load_pred'] = y_pred
+            df_return.loc[(city, window_times), 'load_pred'] = y_pred
         return df_return
 
     def fit_model_and_predict(self, scaler_dict, train_too=False):
