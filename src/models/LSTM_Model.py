@@ -430,7 +430,7 @@ class LSTM_Model:
             self.X_compare = X_compare_2020
             self.fit_model_and_predict(scaler_dict, train_too=True)
 
-        filename_l = ["MSE","RMSE","MAPE","MSE_Scaled","RMSE_Scaled","MAPE_Scaled"]
+        filename_l = ["MSE","RMSE","MAPE"]
         for i in range(len(filename_l)):
             train_error = [self.train_errors[j][i] for j in range(len(self.train_errors))]
             val_error = [self.val_errors[j][i] for j in range(len(self.val_errors))]
