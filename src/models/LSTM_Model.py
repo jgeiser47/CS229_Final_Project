@@ -139,7 +139,7 @@ class LSTM_Model:
         Returns: keras Sequential model object
         """
         model = keras.models.Sequential()
-        num_features = len(self.X_train.columns) - 1
+        num_features = len(self.df.columns) - 1
         if self.layers == 1:
             # TO DO ADD ACTIVATION
             model.add(keras.layers.LSTM(self.hidden_inputs, activation=self.activation, return_sequences=False,
