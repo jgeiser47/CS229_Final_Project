@@ -208,13 +208,17 @@ class LSTM_Model:
     def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
         # Read, combine, and scale data
         self.add_csv_data(city, path, input_keep_cols)
+        self.add_csv_data('boston', path, input_keep_cols)
         float_cols = list(self.df.columns[self.df.dtypes == np.float64])
         self.train_scaler(float_cols)
+        self.df = self.apply_scaler(self.df)
 
         # Split data into parts
         self.split_data_regimes()
 
         print("Splitting and Training")
+        self.fit_model(self.train_df.head(1000))
+        test = self.predict_model(self.train_df.head(1000))
         # Split train and test data
         if test_on_split:
             self.test_on_splits(self.scaler_dict[city], folds)
@@ -238,7 +242,7 @@ class LSTM_Model:
         # Split data by city and create windows
         for city in df.index.get_level_values('city').unique():
             print(f'Fitting on {city} data')
-            city_df = self.apply_scaler(df.loc[city, :])
+            city_df = df.loc[city, :]
 
             X = city_df.drop("load", axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
@@ -264,7 +268,7 @@ class LSTM_Model:
         df_return.assign(load_pred = np.NaN)
         for city in df.index.get_level_values('city').unique():
             print(f'Predicting on {city} data')
-            city_df = self.apply_scaler(df.loc[city, :])
+            city_df = df.loc[city, :]
 
             X = city_df.drop('load', axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
@@ -669,7 +673,7 @@ def main():
                 'cos_week_of_year', 'sin_hour', 'cos_hour']
 
     # Train model and predict
-    lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=5,
+    lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=1,
                       activation="relu", preserve_weights=True)
 
     lstm.run_experiment('houston', data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
