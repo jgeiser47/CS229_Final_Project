@@ -233,11 +233,10 @@ class LSTM_Model:
             df.loc[(city, slice(None)), 'load_pred'] = y_pred
         return df
 
-    def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
+    def run_experiment(self, cities, path, input_keep_cols, test_on_split=False, folds = 6):
         # Read, combine, and scale data
-        # Add data by cities in alphabetical order to speed things up
-        self.add_csv_data('boston', path, input_keep_cols)
-        self.add_csv_data(city, path, input_keep_cols)
+        for city in sorted(cities):
+            self.add_csv_data(city, path, input_keep_cols)
         float_cols = list(self.df.columns[self.df.dtypes == np.float64])
         self.train_scaler(float_cols)
         self.df = self.apply_scaler(self.df)
@@ -624,7 +623,7 @@ def main():
     lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=1,
                       activation="relu", preserve_weights=True)
 
-    lstm.run_experiment('houston', data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
+    lstm.run_experiment(['houston', 'boston'], data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
     #for city in cities:
     #    print(f"Fitting on data from {city}")
     #    lstm.run_experiment(city, data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
