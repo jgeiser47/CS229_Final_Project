@@ -223,6 +223,33 @@ class LSTM_Model:
             self.train_test_split()
             self.fit_model_and_predict(self.scaler_dict[city])
 
+    def fit_model(self, df):
+        """Fit self.model to the passed data frame df, split by city to prevent problems
+        with window crossovers.
+
+        Args:
+            df: the dataframe to fit the model with. It will probably be a row subset
+                of self.df.
+        Returns: None, but the self.model is updated via the fitting process
+        """
+        # Define model
+        if self.model is None or self.preserve_weights is False:
+            self.define_fit_vanilla_lstm()
+
+        # Split data by city and create windows
+        for city in df.index.get_level_values('city').unique():
+            print(f'Fitting on {city} data')
+            city_df = df.loc[city, :]
+
+            X = city_df.drop("load", axis=1).to_numpy()
+            X_tensor = self.create_window_data(X)
+
+            y = city_df.loc[:,"load"].to_numpy()
+            y = np.expand_dims(y, axis=1)
+            y_tensor = self.create_window_data(y, keep_whole_window=False)
+
+            self.model.fit(X_tensor, y_tensor, epochs=self.epochs)
+
     def fit_model_and_predict(self, scaler_dict, train_too=False):
         # Split data into input and target variables and create tensors
         # For Train data
