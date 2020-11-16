@@ -250,6 +250,35 @@ class LSTM_Model:
 
             self.model.fit(X_tensor, y_tensor, epochs=self.epochs)
 
+    def predict_model(self, df):
+        """Predict load at each time step by adding a new "buddy" column
+            to the original dataframe which gives predicted instead of observed
+            load.
+
+        Args:
+            df: dataframe, a subset of self.df, to predict on and add the
+            prediction column to
+
+        Returns: df with new predicted column
+        """
+        df_return = df.loc[:, 'load'].to_frame()
+        df_return.assign(load_pred = np.NaN)
+        for city in df.index.get_level_values('city').unique():
+            print(f'Predicting on {city} data')
+            city_df = df.loc[city, :]
+
+            X = city_df.drop('load', axis=1).to_numpy()
+            X_tensor = self.create_window_data(X)
+
+            y_pred = self.model.predict(X_tensor)
+
+            # Assign values to the correct part of df_return
+            window_start = city_df.index.get_level_values('time').min() + pd.Timedelta(f'{self.window - 1} hours')
+            window_end = city_df.index.get_level_values('time').max()
+            window_times = pd.date_range(start=window_start, end=window_end, freq='H')
+            df_return.loc[(slice(city), window_times), 'load_pred'] = y_pred
+        return df_return
+
     def fit_model_and_predict(self, scaler_dict, train_too=False):
         # Split data into input and target variables and create tensors
         # For Train data
