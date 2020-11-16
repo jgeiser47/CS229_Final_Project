@@ -235,8 +235,9 @@ class LSTM_Model:
 
     def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
         # Read, combine, and scale data
-        self.add_csv_data(city, path, input_keep_cols)
+        # Add data by cities in alphabetical order to speed things up
         self.add_csv_data('boston', path, input_keep_cols)
+        self.add_csv_data(city, path, input_keep_cols)
         float_cols = list(self.df.columns[self.df.dtypes == np.float64])
         self.train_scaler(float_cols)
         self.df = self.apply_scaler(self.df)
@@ -245,8 +246,12 @@ class LSTM_Model:
         self.split_data_regimes()
 
         print("Splitting and Training")
-        self.fit_model(self.train_df.head(1000))
-        test = self.predict_model(self.train_df.head(1000))
+        test_times = pd.date_range(start='2018-01-01', end='2018-02-01', freq='H')
+        self.fit_model(self.train_df.loc[(slice(None), test_times), :])
+        test = self.predict_model(self.train_df.loc[(slice(None), test_times), :])
+        #TODO: Debug where apply_scaler changes data by reference, and check that we won't inadvertently apply scaling twice.
+        essay = self.prep_eval_data(test)
+
         # Split train and test data
         if test_on_split:
             self.test_on_splits(self.scaler_dict[city], folds)
