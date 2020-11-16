@@ -357,11 +357,11 @@ class LSTM_Model:
             y_pred_train = self.model.predict(X_train_tensor)
             y_train_unscaled = scaler_dict['load'].inverse_transform(y_train_tensor)
             y_pred_train_unscaled = scaler_dict['load'].inverse_transform(y_pred_train)
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, scaler_dict,save_outputs=True,
+            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array,save_outputs=True,
                               train_y_true=y_train_unscaled,
                               train_y_pred=y_pred_train_unscaled, train_dates_arr=date_array_train, swoth = True)
         else:
-            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, scaler_dict,save_outputs=True)
+            self.calc_metrics(y_val_unscaled, y_pred_unscaled, date_array, save_outputs=True)
 
     #         #Find unscaled data and calculate metrics
     #         y_pred = self.model.predict(X_test_tensor)
@@ -451,7 +451,7 @@ class LSTM_Model:
         nsplits_len_test = [int((i -23) / 0.8 * 0.2 // 1) + 23 for i in nsplits_len_train]
         return nsplits_len_train, nsplits_len_test
 
-    def calc_metrics(self, y_true, y_pred, dates_arr, scaler_dict,save_outputs=True,
+    def calc_metrics(self, y_true, y_pred, dates_arr, save_outputs=True,
                      train_y_true=None, train_y_pred=None, train_dates_arr=None, swoth = False):
         '''
         Calculates some metrics and plots for current run of an LSTM and saves them
@@ -502,9 +502,9 @@ class LSTM_Model:
 
         # Error statistics #######################################################
         # self.outputpath = output_dir
-        self.raw_metrics(y_true, y_pred, output_dir, scaler_dict, save_outputs=save_outputs, prefix='val', swoth = swoth)
+        self.raw_metrics(y_true, y_pred, output_dir, save_outputs=save_outputs, prefix='val', swoth = swoth)
         if train_y_true is not None and train_y_pred is not None and train_dates_arr is not None:
-            self.raw_metrics(train_y_true, train_y_pred, output_dir, scaler_dict ,save_outputs=save_outputs, prefix='train',swoth = swoth)
+            self.raw_metrics(train_y_true, train_y_pred, output_dir,save_outputs=save_outputs, prefix='train',swoth = swoth)
 
         # Scatter plot of Predicted vs True Load #################################
 
@@ -529,7 +529,7 @@ class LSTM_Model:
 
         return
 
-    def raw_metrics(self, y_true, y_pred, output_dir, scaler_dict,save_outputs=True, prefix='val', swoth = False):
+    def raw_metrics(self, y_true, y_pred, output_dir, save_outputs=True, prefix='val', swoth = False):
         '''
         Various useful regression metrics, the following link is a helpful reference
         https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics
@@ -558,10 +558,6 @@ class LSTM_Model:
         MSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled)
         RMSE_scaled = metrics.mean_squared_error(y_true_scaled, y_pred_scaled, squared=False)
 
-
-        y_true_scaled = y_true.reshape(len(y_true_scaled),1)
-        MAPE_scaled = (sum(abs(y_true_scaled - y_pred_scaled)/y_true_scaled)/len(y_true_scaled))[0]
-
         metrics_str = ''
         metrics_str += f'Mean Squared Error: {MSE:.2f}\n'
         metrics_str += f'Root Mean Squared Error: {RMSE:.2f}\n'
@@ -570,9 +566,6 @@ class LSTM_Model:
         metrics_str += f'Max Error: {Max_error:.2f}\n'
         metrics_str += f'R2 Score: {R2_score:.3f}\n'
         metrics_str += f'Mean Absolute Percentage Error (MAPE): {MAPE:.4f}\n'
-        metrics_str += f'Mean Squared Error Scaled: {MSE_scaled:.2f}\n'
-        metrics_str += f'Root Mean Squared Error Scaled: {RMSE_scaled:.2f}\n'
-        metrics_str += f'Mean Absolute Percentage Error Scaled: {MAPE_scaled:.4f}\n'
 
         print(metrics_str)
 
@@ -583,11 +576,11 @@ class LSTM_Model:
 
         if swoth:
             if prefix == "val":
-                self.val_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
+                self.val_errors.append([MSE, RMSE, MAPE])
             elif prefix == "train":
-                self.train_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
+                self.train_errors.append([MSE, RMSE, MAPE])
             elif prefix == "test":
-                self.test_errors.append([MSE, RMSE, MAPE, MSE_scaled, RMSE_scaled, MAPE_scaled])
+                self.test_errors.append([MSE, RMSE, MAPE])
 
         return
 
