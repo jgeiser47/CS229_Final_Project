@@ -82,7 +82,7 @@ class LSTM_Model:
                     col_scaler = StandardScaler()
                 else:
                     col_scaler = MinMaxScaler()
-                col_data = self.df.loc[(slice(city), slice(None)), col_name].values
+                col_data = self.df.loc[city, col_name].to_numpy()
                 col_data = np.expand_dims(col_data, axis=1)
                 col_scaler.fit(col_data)
                 self.scaler_dict[city][col_name] = col_scaler
@@ -97,9 +97,10 @@ class LSTM_Model:
         for city in df.index.get_level_values('city').unique():
             cur_dict = self.scaler_dict[city]
             for col_name, col_scaler in cur_dict.items():
-                cur_data = df.loc[(slice(city), slice(None)), col_name].values
+                cur_data = df.loc[city, col_name].to_numpy()
                 cur_data = np.expand_dims(cur_data, axis=1)
-                df.loc[(slice(city), slice(None)), col_name] = col_scaler.transform(cur_data)
+                transformed = col_scaler.transform(cur_data)
+                df.loc[city, col_name] = transformed
         return df
 
 
@@ -273,9 +274,7 @@ class LSTM_Model:
             X = city_df.drop('load', axis=1).to_numpy()
             X_tensor = self.create_window_data(X)
 
-            # Predict and unscale
             y_pred = self.model.predict(X_tensor)
-            y_pred = self.scaler_dict[city]['load'].inverse_transform(y_pred)
 
             # Assign values to the correct part of df_return
             window_start = city_df.index.get_level_values('time').min() + pd.Timedelta(f'{self.window - 1} hours')
