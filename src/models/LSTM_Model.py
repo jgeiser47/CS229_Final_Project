@@ -206,6 +206,33 @@ class LSTM_Model:
         self.compare_df = self.df.loc[(slice(None), compare_times), :]
         self.test_df = self.df.loc[(slice(None), test_times), :]
 
+    def prep_eval_data(self, df):
+        """Prepare a predicted dataset for evaluation.
+
+        Args:
+            df: Dataframe of observed and predicted load data. Must have a MultiIndex like
+                the one in self.df. Must have two data columns, load and load_pred.
+        
+        Returns: A tuple of the three elements to pass to calc_metrics: (dates_arr, y_true, y_pred)
+        """
+        # Remove all rows with NaN in load_pred
+        df = df.dropna().copy()
+
+        # Unscale load columns
+        for city in df.index.get_level_values('city').unique():
+            load_scaler = self.scaler_dict[city]['load']
+
+            y_obs = df.loc[(city, slice(None)), 'load'].to_numpy()
+            y_obs = np.expand_dims(y_obs, axis=1)
+            y_obs = load_scaler.inverse_transform(y_obs)
+            df.loc[(city, slice(None)), 'load'] = y_obs
+
+            y_pred = df.loc[city, 'load_pred'].to_numpy()
+            y_pred = np.expand_dims(y_pred, axis=1)
+            y_pred = load_scaler.inverse_transform(y_pred)
+            df.loc[(city, slice(None)), 'load_pred'] = y_pred
+        return df
+
     def run_experiment(self, city, path, input_keep_cols, test_on_split=False, folds = 6):
         # Read, combine, and scale data
         self.add_csv_data(city, path, input_keep_cols)
