@@ -247,10 +247,19 @@ class LSTM_Model:
 
         # Split train and test data
         if test_on_split:
-            test_times = pd.date_range(start='2018-01-01', end='2018-02-01', freq='H')
-            self.test_on_splits(self.train_df.loc[(slice(None), test_times), :], folds=folds)
+            self.test_on_splits(self.train_df.loc[(slice(None), slice(None)), :], folds=folds)
+
+            # Make test prediction
+            pred_test_df = self.predict_model(self.test_df)
+            pred_test_df = self.prep_eval_data(pred_test_df)
+            self.calc_metrics(y_true=pred_test_df.loc[:,'load'], y_pred=pred_test_df.loc[:, 'load_pred'], dates_arr=pred_test_df.index.get_level_values('time'))
+
+            # Make comparison prediction
+            pred_comp_df = self.predict_model(self.compare_df)
+            pred_comp_df = self.prep_eval_data(pred_comp_df)
+            self.calc_metrics(y_true=pred_comp_df.loc[:,'load'], y_pred=pred_comp_df.loc[:, 'load_pred'], dates_arr=pred_comp_df.index.get_level_values('time'))
         else:
-            self.train_test_split()
+            pass
 
     def fit_model(self, df):
         """Fit self.model to the passed data frame df, split by city to prevent problems
