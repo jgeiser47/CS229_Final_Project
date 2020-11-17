@@ -641,20 +641,16 @@ def main():
     cities = ['houston', 'boston', 'nyc', 'chicago', 'kck']
     data_dir = os.path.join(os.getcwd(), 'data', 'interim')
 
-    keep_cols = ['hour', 'weekday', 'weekend', 'pre_weekend',
-                'post_weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
+    keep_cols = ['weekend', 'holiday', 'dwpc', 'relh', 'sped', 'tmpc', 'load',
                 'city_flag_la', 'city_flag_houston', 'city_flag_boston', 'city_flag_nyc',
-                'city_flag_chicago', 'city_flag_kck', 'week_of_year', 'sin_week_of_year',
+                'city_flag_chicago', 'city_flag_kck', 'sin_week_of_year',
                 'cos_week_of_year', 'sin_hour', 'cos_hour']
 
     # Train model and predict
-    lstm = LSTM_Model(df=None, window=24, layers=2, hidden_inputs=50, last_layer="Dense", scaler="Standard", epochs=1,
-                      activation="relu", preserve_weights=True)
+    lstm = LSTM_Model(df=None, window=24, layers=1, hidden_inputs=75, last_layer="Dense", scaler="Standard", epochs=3,
+                      activation="tanh", preserve_weights=True)
 
     lstm.run_experiment(cities, data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
-    #for city in cities:
-    #    print(f"Fitting on data from {city}")
-    #    lstm.run_experiment(city, data_dir, test_on_split=True, folds=7, input_keep_cols=keep_cols)
 
     return
 
