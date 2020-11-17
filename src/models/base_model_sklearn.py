@@ -43,12 +43,15 @@ def get_data(data_dir, region, city):
     
     # Constants corresponding to start/end rows of CSV (assuming not LA datafile)
     start_index = 0 # First line where all features have data
-    end_index = 26112 # End at last day/hour of 2019
+    end_index = 27552 # End at last day/hour of 2019
     
     # Get list of columns that will be used for X dataset
     x_cols = list(df.columns)
     x_cols.remove('date_hour')
     x_cols.remove('load')
+    x_cols.remove('hour')
+    x_cols.remove('weekday')
+    x_cols.remove('week_of_year')
     
     # Get X dataset as numpy array
     X = df[x_cols][start_index:end_index]
@@ -61,7 +64,7 @@ def get_data(data_dir, region, city):
     
     # Split off December 2019 into a separate validation set for timeseries
     # data visualization
-    slice_index = 25368 - start_index
+    slice_index = 26112 - start_index
     X_test = X[slice_index:]
     y_test = y[slice_index:]
     X = X[:slice_index]
@@ -87,31 +90,35 @@ def main():
     X,y,X_test,y_test,dates_range_test = get_data(data_dir, region, city)
     
     # Split into train and test sets
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.33, random_state=42)
+    #X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.33, random_state=42)
+    X_train = X
+    y_train = y
     
     # Train model and predict 
     mdl = linear_model.LinearRegression()
     mdl.fit(X_train, y_train)
-    y_pred = mdl.predict(X_val)
+    y_pred = mdl.predict(X_test)
     
     # Scatter plot of predictions vs true values
     plt.figure()
-    plt.scatter(y_val, y_pred)
+    plt.scatter(y_test, y_pred)
     plt.xlabel('True Load (MW)')
     plt.ylabel('Predicted Load (MW)')
     plt.title('Linear Regression Predicted vs True Load')
     plt.show()
     
     # Error statistics
-    MSE = mean_squared_error(y_val, y_pred)
-    R2_score = r2_score(y_val, y_pred)
+    MSE = mean_squared_error(y_test, y_pred)
+    R2_score = r2_score(y_test, y_pred)
+    MAPE = (sum(abs(y_test-y_pred) / y_test) / len(y_test))[0]
     
     print(f'Mean Squared Error: {MSE:.2f}')
     print(f'R2 Score: {R2_score:.3f}')
+    print(f'MAPE: {MAPE:.4f}')
     
     ##########################################################################
     
-    y_test_pred = mdl.predict(X_test)
+    #y_test_pred = mdl.predict(X_test)
     dates_arr = to_dt(dates_range_test)
     
     plt.figure()
@@ -119,7 +126,7 @@ def main():
     start_ind = 0
     end_ind = 350
     plt.plot_date(dates_arr[start_ind:end_ind], y_test[start_ind:end_ind], 'b:', label='True')
-    plt.plot_date(dates_arr[start_ind:end_ind], y_test_pred[start_ind:end_ind], 'g:', label='Predicted')
+    plt.plot_date(dates_arr[start_ind:end_ind], y_pred[start_ind:end_ind], 'g:', label='Predicted')
     plt.xticks(rotation=45)
     plt.xlabel('Date')
     plt.ylabel('Load (MW)')
