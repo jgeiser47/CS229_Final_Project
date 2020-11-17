@@ -182,6 +182,7 @@ def parse_third_pass(input_filepath, output_filepath):
     # Add sin/cos terms for hour column and week of year column
     df_in = add_sin_cos_terms(df_in, 'week_of_year')
     df_in = add_sin_cos_terms(df_in, 'hour')
+    df_in = add_sin_cos_terms(df_in, 'weekday')
     
     # Remove unneeded features
     df_in = remove_cols(df_in)
@@ -209,7 +210,7 @@ def main():
     # Get a list containing tuples of input/output filepaths
     io_filepaths = get_io_filepaths()
     
-    # io_filepaths = [io_filepaths[1]] # Just for Houston
+    #io_filepaths = [io_filepaths[1]] # Just for Houston
     
     # Iterate through each region/city and parsing datafile
     for input_filepath,output_filepath in io_filepaths:
